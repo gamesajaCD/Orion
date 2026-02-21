@@ -1,0 +1,2181 @@
+--[[
+    ENZO-YT Script v5 FINAL
+    Full Script with 56 Toggle UI Variants
+]]
+
+-- ========================================
+-- [[ CLEANUP PREVIOUS SCRIPT ]] --
+-- ========================================
+if getgenv().EnzoScriptLoaded then
+    getgenv().EnzoScriptLoaded = false
+end
+task.wait(1)
+
+if getgenv().EnzoConnections then
+    for i, conn in pairs(getgenv().EnzoConnections) do
+        pcall(function() conn:Disconnect() end)
+        getgenv().EnzoConnections[i] = nil
+    end
+end
+getgenv().EnzoConnections = {}
+
+if getgenv().EnzoTweens then
+    for i, tw in pairs(getgenv().EnzoTweens) do
+        pcall(function() tw:Cancel() end)
+        getgenv().EnzoTweens[i] = nil
+    end
+end
+getgenv().EnzoTweens = {}
+
+if getgenv().EnzoBodyMovers then
+    for i, mover in pairs(getgenv().EnzoBodyMovers) do
+        pcall(function() mover:Destroy() end)
+        getgenv().EnzoBodyMovers[i] = nil
+    end
+end
+getgenv().EnzoBodyMovers = {}
+
+if getgenv().EnzoThreads then
+    for i, thread in pairs(getgenv().EnzoThreads) do
+        pcall(function() task.cancel(thread) end)
+        getgenv().EnzoThreads[i] = nil
+    end
+end
+getgenv().EnzoThreads = {}
+
+pcall(function() game:GetService("RunService"):UnbindFromRenderStep("EnzoBypass") end)
+pcall(function() game:GetService("RunService"):UnbindFromRenderStep("EnzoTP") end)
+
+if getgenv().EnzoFluentWindow then
+    pcall(function() getgenv().EnzoFluentWindow:Destroy() end)
+    getgenv().EnzoFluentWindow = nil
+end
+
+if getgenv().ToggleUIInstance then
+    pcall(function() getgenv().ToggleUIInstance:Destroy() end)
+    getgenv().ToggleUIInstance = nil
+end
+
+if getgenv().EnzoHeartbeatConn then
+    pcall(function() getgenv().EnzoHeartbeatConn:Disconnect() end)
+    getgenv().EnzoHeartbeatConn = nil
+end
+
+pcall(function()
+    local char = game:GetService("Players").LocalPlayer.Character
+    if char then
+        for _, part in pairs(char:GetDescendants()) do
+            if part.Name == "EnzoVelocity" or part.Name == "EnzoGyro" then
+                pcall(function() part:Destroy() end)
+            end
+        end
+    end
+end)
+
+task.wait(0.5)
+getgenv().EnzoScriptLoaded = true
+
+-- ========================================
+-- [[ SERVICES ]] --
+-- ========================================
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TeleportService = game:GetService("TeleportService")
+local VirtualUser = game:GetService("VirtualUser")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local MarketplaceService = game:GetService("MarketplaceService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local HttpService = game:GetService("HttpService")
+
+-- ========================================
+-- [[ LOAD FLUENT ]] --
+-- ========================================
+local Fluent = loadstring(game:HttpGet(
+    "https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"
+))()
+local SaveManager = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"
+))()
+local InterfaceManager = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"
+))()
+
+-- ========================================
+-- [[ GAME NAME ]] --
+-- ========================================
+local success, info = pcall(function()
+    return MarketplaceService:GetProductInfo(game.PlaceId).Name
+end)
+local gameName = success and info or "ENZO-YT Script"
+
+-- ========================================
+-- [[ WINDOW ]] --
+-- ========================================
+local Window = Fluent:CreateWindow({
+    Title = gameName .. " | ENZO-YT",
+    SubTitle = "by ENZO-YT",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+getgenv().EnzoFluentWindow = Window
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "swords" }),
+    Misc = Window:AddTab({ Title = "Misc", Icon = "wrench" }),
+    Player = Window:AddTab({ Title = "Player", Icon = "user" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+local Options = Fluent.Options
+
+-- ========================================
+-- [[ THREAD TRACKER ]] --
+-- ========================================
+local function safeLoop(interval, func)
+    local thread = task.spawn(function()
+        while getgenv().EnzoScriptLoaded do
+            local ok, err = pcall(func)
+            if not ok then warn("[ENZO] " .. tostring(err)) end
+            task.wait(interval)
+        end
+    end)
+    table.insert(getgenv().EnzoThreads, thread)
+    return thread
+end
+
+-- ========================================
+-- [[ REMOTE FUNCTIONS ]] --
+-- ========================================
+local function fireRemote(args)
+    pcall(function()
+        ReplicatedStorage:WaitForChild("ffrostflame_bridgenet2@1.0.0"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
+    end)
+end
+
+local function fireClickEnemy(uniqueId)
+    fireRemote({{{"ClickSystem","Execute",uniqueId,n=3},"\002"}})
+end
+
+local function fireClick()
+    fireRemote({{{"ClickSystem","Execute",n=3},"\002"}})
+end
+
+local function fireEquipBest()
+    fireRemote({{{"PetSystem","EquipBest",n=2},"\002"}})
+end
+
+local function fireQuestCheck()
+    fireRemote({
+        {
+            {
+                "QuestSystem",
+                "Check",
+                "Main",
+                1,
+                n = 4
+            },
+            "\002"
+        }
+    })
+end
+
+-- ========================================
+-- [[ CHARACTER ]] --
+-- ========================================
+local function getCharacter()
+    local char = LocalPlayer.Character
+    if char then
+        return char, char:FindFirstChild("HumanoidRootPart"), char:FindFirstChild("Humanoid")
+    end
+    return nil, nil, nil
+end
+
+-- ========================================
+-- [[ ENEMY UTILITIES ]] --
+-- ========================================
+local function getEnemyModels()
+    local ef = Workspace:FindFirstChild("_ENEMIES")
+    if not ef then return {} end
+    local cf = ef:FindFirstChild("Client")
+    if not cf then return {} end
+    return cf:GetChildren()
+end
+
+local function getUniqueEnemyNames()
+    local names, seen = {}, {}
+    for _, model in ipairs(getEnemyModels()) do
+        pcall(function()
+            local bb = model:FindFirstChild("EnemyBillboard")
+            if bb then
+                local t = bb:FindFirstChild("Title")
+                if t and t:IsA("TextLabel") and t.Text ~= "" and not seen[t.Text] then
+                    seen[t.Text] = true
+                    table.insert(names, t.Text)
+                end
+            end
+        end)
+    end
+    table.sort(names)
+    return names
+end
+
+local function findEnemyModelsByName(enemyName)
+    local result = {}
+    for _, model in ipairs(getEnemyModels()) do
+        pcall(function()
+            local bb = model:FindFirstChild("EnemyBillboard")
+            if bb then
+                local t = bb:FindFirstChild("Title")
+                if t and t:IsA("TextLabel") and t.Text == enemyName then
+                    table.insert(result, model)
+                end
+            end
+        end)
+    end
+    return result
+end
+
+local function getEnemyUniqueId(model) return model.Name end
+
+local function getEnemyPosition(model)
+    local pos = nil
+    pcall(function()
+        if model:IsA("Model") then
+            local p = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
+            if p then pos = p.Position end
+        elseif model:IsA("BasePart") then
+            pos = model.Position
+        end
+    end)
+    return pos
+end
+
+local function isModelAlive(model)
+    if not model then return false end
+    local ok, result = pcall(function()
+        if model.Parent == nil then return false end
+        if model.Parent.Name ~= "Client" then return false end
+        return true
+    end)
+    if not ok then return false end
+    return result
+end
+
+-- ========================================
+-- [[ SMART MOVEMENT ]] --
+-- ========================================
+local BYPASS_SPEED = 200
+local STUCK_CHECK_INTERVAL = 0.5
+local STUCK_THRESHOLD = 2
+local MAX_STUCK_COUNT = 5
+
+local function cleanOurMovers()
+    pcall(function()
+        local char = LocalPlayer.Character
+        if not char then return end
+        for _, part in pairs(char:GetDescendants()) do
+            if part.Name == "EnzoVelocity" or part.Name == "EnzoGyro" then
+                pcall(function() part:Destroy() end)
+            end
+        end
+    end)
+end
+
+local function isFarmActive()
+    if not getgenv().EnzoScriptLoaded then return false end
+    local farmOn = Options.AutoFarm and Options.AutoFarm.Value or false
+    local questOn = Options.AutoQuest and Options.AutoQuest.Value or false
+    return farmOn or questOn
+end
+
+local function stopMovement()
+    cleanOurMovers()
+    pcall(function()
+        local _, hrp, hum = getCharacter()
+        if hrp then
+            hrp.Velocity = Vector3.new(0,0,0)
+            hrp.AssemblyLinearVelocity = Vector3.new(0,0,0)
+        end
+        if hum and hrp then hum:MoveTo(hrp.Position) end
+    end)
+end
+
+local function findAlternativePosition(currentPos, targetPos, attempt)
+    local direction = (targetPos - currentPos).Unit
+    local right = direction:Cross(Vector3.new(0,1,0)).Unit
+    local up = Vector3.new(0,1,0)
+    local offsets = {
+        right*30, right*-30, up*30, right*30+up*20,
+        right*-30+up*20, direction*-15+right*40,
+        direction*-15+right*-40, up*50
+    }
+    return currentPos + offsets[((attempt-1)%#offsets)+1]
+end
+
+local function smartFlyTo(targetPosition, speed)
+    local char, hrp = getCharacter()
+    if not hrp then return false end
+    local targetPos = targetPosition + Vector3.new(0,3,0)
+    local flySpeed = speed or BYPASS_SPEED
+    cleanOurMovers()
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "EnzoVelocity"
+    bv.MaxForce = Vector3.new(math.huge,math.huge,math.huge)
+    bv.Velocity = Vector3.new(0,0,0)
+    bv.Parent = hrp
+    table.insert(getgenv().EnzoBodyMovers, bv)
+
+    local bg = Instance.new("BodyGyro")
+    bg.Name = "EnzoGyro"
+    bg.MaxTorque = Vector3.new(math.huge,math.huge,math.huge)
+    bg.D = 100; bg.P = 10000
+    bg.Parent = hrp
+    table.insert(getgenv().EnzoBodyMovers, bg)
+
+    local startTime = tick()
+    local arrived = false
+    local lastPos = hrp.Position
+    local lastCheckTime = tick()
+    local stuckCount = 0
+    local currentTarget = targetPos
+    local isRerouting = false
+    local rerouteTarget = nil
+
+    while getgenv().EnzoScriptLoaded and isFarmActive() do
+        char, hrp = getCharacter()
+        if not hrp then break end
+        if (tick()-startTime) > 40 then break end
+        if not bv or not bv.Parent then break end
+
+        local currentPos = hrp.Position
+        if (targetPos-currentPos).Magnitude < 5 then arrived = true; break end
+
+        if (tick()-lastCheckTime) >= STUCK_CHECK_INTERVAL then
+            local movedDist = (currentPos-lastPos).Magnitude
+            if movedDist < STUCK_THRESHOLD then
+                stuckCount = stuckCount + 1
+                if stuckCount >= MAX_STUCK_COUNT then break end
+                isRerouting = true
+                rerouteTarget = findAlternativePosition(currentPos, targetPos, stuckCount)
+            else
+                if isRerouting and rerouteTarget then
+                    if (rerouteTarget-currentPos).Magnitude < 10 then
+                        isRerouting = false; rerouteTarget = nil
+                        stuckCount = math.max(0,stuckCount-1)
+                    end
+                else
+                    stuckCount = math.max(0,stuckCount-1)
+                end
+            end
+            lastPos = currentPos; lastCheckTime = tick()
+        end
+
+        currentTarget = (isRerouting and rerouteTarget) and rerouteTarget or targetPos
+        local direction = (currentTarget-currentPos)
+        local dist = direction.Magnitude
+        if dist > 0.5 then
+            local moveDir = direction.Unit
+            local actualSpeed = math.min(flySpeed, dist*3)
+            if stuckCount >= 2 then
+                moveDir = (moveDir + Vector3.new(0,0.5,0)).Unit
+                actualSpeed = flySpeed * 0.8
+            end
+            bv.Velocity = moveDir * actualSpeed
+            bg.CFrame = CFrame.lookAt(currentPos, Vector3.new(currentTarget.X, currentPos.Y, currentTarget.Z))
+        end
+        RunService.Heartbeat:Wait()
+    end
+
+    cleanOurMovers()
+    pcall(function()
+        _, hrp = getCharacter()
+        if hrp then hrp.Velocity = Vector3.new(0,0,0); hrp.AssemblyLinearVelocity = Vector3.new(0,0,0) end
+    end)
+    return arrived
+end
+
+local function smartWalkTo(targetPosition)
+    local char, hrp, hum = getCharacter()
+    if not hum or not hrp then return false end
+    hum:MoveTo(targetPosition)
+    local startTime = tick()
+    local lastRepath = tick()
+    local lastPos = hrp.Position
+    local lastStuckCheck = tick()
+    local stuckCount = 0
+
+    while getgenv().EnzoScriptLoaded and isFarmActive() do
+        char, hrp, hum = getCharacter()
+        if not hrp or not hum then return false end
+        if (hrp.Position-targetPosition).Magnitude < 8 then return true end
+        if (tick()-startTime) > 60 then return false end
+
+        if (tick()-lastRepath) > 1 then hum:MoveTo(targetPosition); lastRepath = tick() end
+
+        if (tick()-lastStuckCheck) >= STUCK_CHECK_INTERVAL then
+            if (hrp.Position-lastPos).Magnitude < STUCK_THRESHOLD then
+                stuckCount = stuckCount + 1
+                if stuckCount >= 2 then pcall(function() hum.Jump = true end) end
+                if stuckCount >= 4 then
+                    hum:MoveTo(findAlternativePosition(hrp.Position, targetPosition, stuckCount))
+                    lastRepath = tick() + 2; stuckCount = 0
+                end
+            else
+                stuckCount = math.max(0,stuckCount-1)
+            end
+            lastPos = hrp.Position; lastStuckCheck = tick()
+        end
+        task.wait(0.1)
+    end
+    pcall(function() _, hrp, hum = getCharacter(); if hum and hrp then hum:MoveTo(hrp.Position) end end)
+    return false
+end
+
+local function moveToByMethod(position, method)
+    if not position or not getgenv().EnzoScriptLoaded or not isFarmActive() then return false end
+    if method == "Teleport" then return smartFlyTo(position, BYPASS_SPEED)
+    elseif method == "Tween" then return smartFlyTo(position, 100)
+    elseif method == "Walk" then return smartWalkTo(position)
+    else return smartFlyTo(position, BYPASS_SPEED) end
+end
+
+local function stayNearEnemy(enemyModel, method)
+    if not isFarmActive() then cleanOurMovers(); return false end
+    local enemyPos = nil
+    pcall(function()
+        if enemyModel.Parent then
+            local part = enemyModel:FindFirstChildWhichIsA("BasePart")
+            if part then enemyPos = part.Position end
+        end
+    end)
+    if not enemyPos then return false end
+    local _, hrp = getCharacter()
+    if not hrp then return false end
+    local dist = (hrp.Position-enemyPos).Magnitude
+    if dist > 12 then
+        if method == "Walk" then
+            local _,_,hum = getCharacter(); if hum then hum:MoveTo(enemyPos) end
+        else
+            cleanOurMovers()
+            local bv = Instance.new("BodyVelocity")
+            bv.Name = "EnzoVelocity"; bv.MaxForce = Vector3.new(math.huge,math.huge,math.huge)
+            local dir = (enemyPos+Vector3.new(0,3,0)-hrp.Position)
+            local dirUnit = dir.Unit
+            if dist > 30 then dirUnit = (dirUnit+Vector3.new(0,0.3,0)).Unit end
+            bv.Velocity = dirUnit * math.min(dist*5, 200)
+            bv.Parent = hrp; table.insert(getgenv().EnzoBodyMovers, bv)
+            task.wait(0.15); cleanOurMovers()
+            pcall(function() hrp.Velocity = Vector3.new(0,0,0); hrp.AssemblyLinearVelocity = Vector3.new(0,0,0) end)
+        end
+    end
+    return true
+end
+
+-- ========================================
+-- [[ QUEST UTILITIES ]] --
+-- ========================================
+local function parseQuestText(text)
+    if not text or text == "" then return nil end
+    local en, cur, mx = text:match("Defeat%s+(.+)%s+%[(%d+)/(%d+)%]")
+    if en and cur and mx then
+        return {name=en:match("^%s*(.-)%s*$"), current=tonumber(cur), max=tonumber(mx), raw=text}
+    end
+    return nil
+end
+
+local function getActiveQuests()
+    local quests = {}
+    pcall(function()
+        local sg = LocalPlayer.PlayerGui:FindFirstChild("SideGUI")
+        if not sg then return end
+        local c = sg:FindFirstChild("Content")
+        if not c then return end
+        local qf = c:FindFirstChild("ActiveQuest")
+        if not qf then return end
+        for _, child in pairs(qf:GetDescendants()) do
+            if child:IsA("TextLabel") then
+                local parsed = parseQuestText(child.ContentText or child.Text or "")
+                if parsed then table.insert(quests, parsed) end
+            end
+        end
+    end)
+    return quests
+end
+
+local function isQuestComplete(qd) return qd.current >= qd.max end
+
+local function getQuestProgress(en)
+    for _, q in ipairs(getActiveQuests()) do if q.name == en then return q end end
+    return nil
+end
+
+-- ========================================
+-- [[ TAB: MAIN ]] --
+-- ========================================
+Tabs.Main:AddSection("Main Feature")
+
+local enemyNames = getUniqueEnemyNames()
+if #enemyNames == 0 then enemyNames = {"No Enemies Found"} end
+
+local DropdownEnemy = Tabs.Main:AddDropdown("EnemyDropdown", {
+    Title = "Select Enemy", Description = "Auto-refreshes every 3s",
+    Values = enemyNames, Multi = true, Default = {},
+})
+
+safeLoop(3, function()
+    local nn = getUniqueEnemyNames()
+    if #nn == 0 then nn = {"No Enemies Found"} end
+    local cv = DropdownEnemy.Values or {}
+    local changed = #nn ~= #cv
+    if not changed then for i,v in ipairs(nn) do if cv[i]~=v then changed=true; break end end end
+    if changed then DropdownEnemy:SetValues(nn) end
+end)
+
+local DropdownMethod = Tabs.Main:AddDropdown("MethodDropdown", {
+    Title = "Farm Method", Description = "Teleport(fast)/Tween(smooth)/Walk(normal)",
+    Values = {"Teleport","Tween","Walk"}, Multi = false, Default = "Teleport",
+})
+
+local ToggleAutoFarm = Tabs.Main:AddToggle("AutoFarm", {
+    Title = "Auto Farm", Description = "Auto next when enemy dies", Default = false,
+})
+ToggleAutoFarm:OnChanged(function(v) if not v then stopMovement() end end)
+
+-- Auto Farm Thread
+task.spawn(function()
+    table.insert(getgenv().EnzoThreads, coroutine.running())
+    while getgenv().EnzoScriptLoaded do
+        if not Options.AutoFarm.Value then task.wait(0.3); continue end
+        local sel = Options.EnemyDropdown.Value
+        local method = Options.MethodDropdown.Value or "Teleport"
+        if not sel or type(sel) ~= "table" then task.wait(0.5); continue end
+
+        local selNames = {}
+        for name, on in pairs(sel) do if on and name ~= "No Enemies Found" then table.insert(selNames, name) end end
+        if #selNames == 0 then task.wait(0.5); continue end
+
+        local allEnemies = {}
+        for _, en in ipairs(selNames) do
+            for _, e in ipairs(findEnemyModelsByName(en)) do
+                if isModelAlive(e) then table.insert(allEnemies, e) end
+            end
+        end
+        if #allEnemies == 0 then task.wait(1); continue end
+
+        for i, currentEnemy in ipairs(allEnemies) do
+            if not getgenv().EnzoScriptLoaded or not Options.AutoFarm.Value then stopMovement(); break end
+            if not isModelAlive(currentEnemy) then continue end
+
+            local ePos = getEnemyPosition(currentEnemy)
+            local uid = getEnemyUniqueId(currentEnemy)
+            if not ePos or not uid then continue end
+
+            local enemyDied = false
+            local deathConn = nil
+            pcall(function()
+                deathConn = currentEnemy.AncestryChanged:Connect(function(_, np)
+                    if np == nil then enemyDied = true end
+                end)
+            end)
+
+            pcall(function()
+                local bb = currentEnemy:FindFirstChild("EnemyBillboard")
+                if bb then local t = bb:FindFirstChild("Title")
+                    if t then Fluent:Notify({Title="Auto Farm",Content="Target: "..t.Text.." ("..i.."/"..#allEnemies..")",Duration=2}) end
+                end
+            end)
+
+            moveToByMethod(ePos, method)
+            if not Options.AutoFarm.Value then stopMovement(); pcall(function() if deathConn then deathConn:Disconnect() end end); break end
+
+            local attackStart = tick()
+            while getgenv().EnzoScriptLoaded and Options.AutoFarm.Value do
+                if enemyDied then break end
+                local pOk = pcall(function() return currentEnemy.Parent end)
+                if not pOk or currentEnemy.Parent == nil then break end
+                if (tick()-attackStart) > 120 then break end
+                stayNearEnemy(currentEnemy, method)
+                fireClickEnemy(uid)
+                task.wait(0.01)
+            end
+
+            pcall(function() if deathConn then deathConn:Disconnect() end end)
+            cleanOurMovers()
+            task.wait(0.1)
+        end
+        cleanOurMovers(); task.wait(0.5)
+    end
+end)
+
+-- Auto Quest
+local ToggleAutoQuest = Tabs.Main:AddToggle("AutoQuest", {
+    Title = "Auto Quest", Description = "Farm quest enemies until complete", Default = false,
+})
+ToggleAutoQuest:OnChanged(function(v) if not v then stopMovement() end end)
+
+task.spawn(function()
+    table.insert(getgenv().EnzoThreads, coroutine.running())
+    while getgenv().EnzoScriptLoaded do
+        if not Options.AutoQuest.Value then task.wait(0.3); continue end
+        local method = Options.MethodDropdown.Value or "Teleport"
+        local quests = getActiveQuests()
+        if #quests == 0 then task.wait(2); continue end
+
+        for _, qd in ipairs(quests) do
+            if not getgenv().EnzoScriptLoaded or not Options.AutoQuest.Value then break end
+            if isQuestComplete(qd) then continue end
+            local en = qd.name
+            Fluent:Notify({Title="Auto Quest",Content="Farming: "..en.." ["..qd.current.."/"..qd.max.."]",Duration=3})
+
+            while getgenv().EnzoScriptLoaded and Options.AutoQuest.Value do
+                local uq = getQuestProgress(en)
+                if not uq or isQuestComplete(uq) then
+    Fluent:Notify({Title="Auto Quest",Content="Completed: "..en.."! Claiming...",Duration=3})
+    fireQuestCheck()
+    task.wait(1)
+    fireQuestCheck() -- Fire 2x untuk memastikan
+    cleanOurMovers(); break
+end
+                local enemies = findEnemyModelsByName(en)
+                if #enemies == 0 then task.wait(2); continue end
+
+                for _, em in ipairs(enemies) do
+                    if not getgenv().EnzoScriptLoaded or not Options.AutoQuest.Value then break end
+                    local q = getQuestProgress(en); if not q or isQuestComplete(q) then break end
+                    if not isModelAlive(em) then continue end
+                    local ePos = getEnemyPosition(em); local uid = getEnemyUniqueId(em)
+                    if not ePos or not uid then continue end
+
+                    local died = false
+                    local dc2 = nil
+                    pcall(function() dc2 = em.AncestryChanged:Connect(function(_,np) if np==nil then died=true end end) end)
+                    moveToByMethod(ePos, method)
+                    if not Options.AutoQuest.Value then pcall(function() if dc2 then dc2:Disconnect() end end); stopMovement(); break end
+
+                    local as = tick()
+                    while getgenv().EnzoScriptLoaded and Options.AutoQuest.Value do
+                        if died then break end
+                        local pOk = pcall(function() return em.Parent end)
+                        if not pOk or em.Parent == nil then break end
+                        if (tick()-as) > 120 then break end
+                        local qc = getQuestProgress(en)
+if qc and isQuestComplete(qc) then
+    fireQuestCheck()
+    task.wait(0.5)
+    break
+end
+                        stayNearEnemy(em, method); fireClickEnemy(uid); task.wait(0.01)
+                    end
+                    pcall(function() if dc2 then dc2:Disconnect() end end)
+                    cleanOurMovers(); task.wait(0.1)
+                end
+                task.wait(0.3)
+            end
+            cleanOurMovers()
+        end
+        task.wait(1)
+    end
+end)
+
+-- ========================================
+-- [[ TAB: MISC ]] --
+-- ========================================
+Tabs.Misc:AddSection("Misc Features")
+
+Tabs.Misc:AddSlider("ClickWaitSlider", {
+    Title = "Auto Click Interval (s)", Default = 0.5, Min = 0.1, Max = 10, Rounding = 1,
+})
+
+Tabs.Misc:AddToggle("AutoClick", {Title = "Auto Click", Default = false})
+
+safeLoop(0.05, function()
+    if Options.AutoClick.Value then
+        fireClick()
+        local w = (Options.ClickWaitSlider.Value or 0.5) - 0.05
+        if w > 0 then task.wait(w) end
+    end
+end)
+
+Tabs.Misc:AddToggle("AutoEquipBest", {Title = "Auto Equip Best Pet", Description = "Every 10s", Default = false})
+
+safeLoop(0.5, function()
+    if Options.AutoEquipBest.Value then fireEquipBest(); task.wait(9.5) end
+end)
+
+-- ========================================
+-- [[ TAB: PLAYER ]] --
+-- ========================================
+Tabs.Player:AddSection("Player Settings")
+
+Tabs.Player:AddToggle("AntiAFK", {Title = "Anti AFK", Default = true})
+local afkC = LocalPlayer.Idled:Connect(function()
+    if Options.AntiAFK.Value then
+        VirtualUser:CaptureController(); VirtualUser:ClickButton2(Vector2.new())
+        Fluent:Notify({Title="Anti AFK",Content="Preventing Idle...",Duration=2})
+    end
+end)
+table.insert(getgenv().EnzoConnections, afkC)
+
+Tabs.Player:AddToggle("AutoRejoin", {Title = "Auto Rejoin on Kick", Default = true})
+pcall(function()
+    local po = game:GetService("CoreGui"):WaitForChild("RobloxPromptGui"):WaitForChild("promptOverlay")
+    local rc = po.ChildAdded:Connect(function(child)
+        if Options.AutoRejoin.Value and child.Name == "ErrorPrompt" then
+            task.wait(2); if child:FindFirstChild("Message") then
+                Fluent:Notify({Title="Rejoin",Content="Kick detected. Rejoining...",Duration=3})
+                TeleportService:Teleport(game.PlaceId, LocalPlayer)
+            end
+        end
+    end)
+    table.insert(getgenv().EnzoConnections, rc)
+end)
+
+Tabs.Player:AddButton({Title="Rejoin Server",Callback=function()
+    Fluent:Notify({Title="Rejoin",Content="Rejoining...",Duration=3}); task.wait(1)
+    TeleportService:Teleport(game.PlaceId, LocalPlayer)
+end})
+
+Tabs.Player:AddButton({Title="Server Hop",Callback=function()
+    Fluent:Notify({Title="Server Hop",Content="Finding server...",Duration=3})
+    pcall(function()
+        local d = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
+        if d and d.data then for _,s in ipairs(d.data) do
+            if s.playing < s.maxPlayers and s.id ~= game.JobId then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer); return
+            end
+        end end
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+    end)
+end})
+
+Tabs.Player:AddSection("Movement")
+
+Tabs.Player:AddInput("SpeedInput", {Title="WalkSpeed Amount",Default="50",Placeholder="50",Numeric=true,Finished=true})
+Tabs.Player:AddToggle("SpeedToggle", {Title="Activate WalkSpeed",Default=false})
+
+safeLoop(0.1, function()
+    if Options.SpeedToggle.Value then
+        local c = LocalPlayer.Character
+        if c then local h = c:FindFirstChild("Humanoid")
+            if h then local s = tonumber(Options.SpeedInput.Value) or 50; if h.WalkSpeed ~= s then h.WalkSpeed = s end end
+        end
+    end
+end)
+
+-- ========================================
+-- [[ TAB: SETTINGS ]] --
+-- ========================================
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+InterfaceManager:SetFolder("EnzoYTScript")
+SaveManager:SetFolder("EnzoYTScript")
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+-- ========================================
+-- [[ DEBUG BUTTON ]] --
+-- ========================================
+Tabs.Misc:AddSection("Debug")
+Tabs.Misc:AddButton({Title="Debug: Check Enemy Status",Callback=function()
+    for _, model in ipairs(getEnemyModels()) do
+        local name = "unknown"
+        pcall(function()
+            local bb = model:FindFirstChild("EnemyBillboard")
+            if bb then local t = bb:FindFirstChild("Title"); if t then name = t.Text end end
+        end)
+        local alive = isModelAlive(model)
+        print("[ENZO DEBUG] "..name.." | ID: "..model.Name.." | Alive: "..tostring(alive))
+        Fluent:Notify({Title="Debug",Content=name.." - "..tostring(alive),Duration=2})
+    end
+end})
+
+-- ========================================
+-- [[ TOGGLE UI SYSTEM ]] --
+-- ========================================
+
+Tabs.Player:AddSection("Toggle UI Style")
+
+local UI_VARIANTS = {
+    "A - Hexagon Cyber","B - Floating Orb","C - Diamond Crystal","D - Radar Pulse",
+    "E - Flame Ring","F - Galaxy Spiral","G - Atomic Nucleus","H - Heartbeat Monitor",
+    "I - Yin Yang","J - Glitch Matrix","K - Compass Navigator","L - Dragon Ball",
+    "M - Demon Slayer","N - One Piece","O - Rasengan","P - Survey Corps",
+    "Q - Gojo Infinity","R - Death Note","S - Bleach Hollow","T - Jujutsu Kaisen",
+    "U - Cyberpunk Chip","V - Hologram Core","W - Neon Circuit","X - AI Neural Net",
+    "Y - Quantum Portal","Z - Sakura Petals",
+    "01 - Eternal Mangekyo","02 - Gear 5 Nika","03 - Ultra Instinct","04 - Cursed Seal",
+    "05 - Titan Core","06 - Plasma Reactor","07 - Binary Storm","08 - Void Singularity",
+    "09 - Chrome Sentinel","10 - Rinnegan Eye",
+    "11 - SpongeBob","12 - Upin Ipin","13 - Doraemon","14 - Pokemon Ball",
+    "15 - Sailor Moon","16 - Totoro","17 - Pikachu","18 - Goku SSJ",
+    "19 - Luffy Gear",
+	"20 - Nezuko Fire",
+	"21 - Patrick Star",
+    "22 - Finn Adventure",
+    "23 - Gumball",
+    "24 - Ben 10 Omnitrix",
+    "25 - Avatar Aang",
+    "26 - Powerpuff Girls",
+    "27 - Dexter Lab",
+    "28 - Tom & Jerry",
+    "29 - Naruto Chibi",
+    "30 - Shinchan"
+}
+
+local function buildToggleUI(variantKey)
+    if getgenv().ToggleUIInstance then
+        pcall(function() getgenv().ToggleUIInstance:Destroy() end)
+        getgenv().ToggleUIInstance = nil
+    end
+
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "ToggleUI_Enzo"
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    getgenv().ToggleUIInstance = ScreenGui
+
+    local Container = Instance.new("Frame")
+    Container.Name = "Container"; Container.Parent = ScreenGui
+    Container.Position = UDim2.new(0,10,0.45,0)
+    Container.Size = UDim2.new(0,64,0,64)
+    Container.BackgroundTransparency = 1; Container.Active = true
+
+    local ToggleBtn = Instance.new("TextButton")
+    ToggleBtn.Parent = Container
+    ToggleBtn.AnchorPoint = Vector2.new(0.5,0.5)
+    ToggleBtn.Position = UDim2.new(0.5,0,0.5,0)
+    ToggleBtn.Size = UDim2.new(1.1,0,1.1,0)
+    ToggleBtn.BackgroundTransparency = 1; ToggleBtn.Text = ""; ToggleBtn.ZIndex = 10
+
+    local dragging,dragInput,dragStart,startPos,hasDragged = false,nil,nil,nil,false
+    ToggleBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging=true; hasDragged=false; dragStart=input.Position; startPos=Container.Position
+            input.Changed:Connect(function() if input.UserInputState==Enum.UserInputState.End then dragging=false end end)
+        end
+    end)
+    ToggleBtn.InputChanged:Connect(function(input)
+        if input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch then dragInput=input end
+    end)
+    local dc = UserInputService.InputChanged:Connect(function(input)
+        if input==dragInput and dragging then
+            local d=input.Position-dragStart; if d.Magnitude>5 then hasDragged=true end
+            Container.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+d.X,startPos.Y.Scale,startPos.Y.Offset+d.Y)
+        end
+    end)
+    table.insert(getgenv().EnzoConnections, dc)
+
+    local function doToggle()
+        VirtualInputManager:SendKeyEvent(true,Enum.KeyCode.LeftControl,false,game)
+        task.wait(0.05)
+        VirtualInputManager:SendKeyEvent(false,Enum.KeyCode.LeftControl,false,game)
+    end
+
+    local function makeCircle(parent,size,color,transp)
+        local f=Instance.new("Frame"); f.Parent=parent
+        f.AnchorPoint=Vector2.new(0.5,0.5); f.Position=UDim2.new(0.5,0,0.5,0)
+        f.Size=UDim2.new(size,0,size,0)
+        f.BackgroundColor3=color or Color3.fromRGB(20,20,20)
+        f.BackgroundTransparency=transp or 0; f.BorderSizePixel=0
+        Instance.new("UICorner",f).CornerRadius=UDim.new(1,0)
+        return f
+    end
+
+    local function makeStroke(parent,color,thickness)
+        local s=Instance.new("UIStroke"); s.Parent=parent
+        s.Color=color or Color3.fromRGB(255,255,255); s.Thickness=thickness or 2
+        return s
+    end
+
+    local function makeIcon(parent,color,size,zi)
+        local img=Instance.new("ImageLabel"); img.Parent=parent
+        img.AnchorPoint=Vector2.new(0.5,0.5); img.Position=UDim2.new(0.5,0,0.5,0)
+        img.Size=UDim2.new(size or 0.4,0,size or 0.4,0); img.BackgroundTransparency=1
+        img.Image="rbxassetid://127230896526363"
+        img.ImageColor3=color or Color3.fromRGB(255,255,255)
+        img.ScaleType=Enum.ScaleType.Fit; img.ZIndex=zi or 6
+        return img
+    end
+
+    local function makeRect(parent,pos,size,color,rot,zi)
+        local f=Instance.new("Frame"); f.Parent=parent
+        f.AnchorPoint=Vector2.new(0.5,0.5); f.Position=pos
+        f.Size=size; f.BackgroundColor3=color; f.BorderSizePixel=0
+        f.Rotation=rot or 0; f.ZIndex=zi or 3
+        return f
+    end
+
+    -- Determine key
+    local key
+    local numPrefix = variantKey:match("^(%d+)%s")
+    if numPrefix then
+        key = numPrefix
+    else
+        key = string.sub(variantKey,1,1)
+    end
+
+    -- ===========================
+    -- ALL VARIANTS
+    -- ===========================
+
+    if key == "A" then
+        local bg = makeCircle(Container,0.95,Color3.fromRGB(10,10,30))
+        bg:FindFirstChildWhichIsA("UICorner").CornerRadius = UDim.new(0.3,0)
+        makeStroke(bg,Color3.fromRGB(0,200,255),2)
+        makeIcon(bg,Color3.fromRGB(0,255,220))
+        local scan = Instance.new("Frame",bg); scan.AnchorPoint=Vector2.new(0.5,0); scan.Position=UDim2.new(0.5,0,0,0)
+        scan.Size=UDim2.new(0.8,0,0,2); scan.BackgroundColor3=Color3.fromRGB(0,255,200); scan.BackgroundTransparency=0.3; scan.BorderSizePixel=0; scan.ZIndex=5
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end
+            pcall(function() local y=scan.Position.Y.Scale+dt*0.8; if y>1 then y=0 end; scan.Position=UDim2.new(0.5,0,y,0) end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "B" then
+        local glow=makeCircle(Container,1.3,Color3.fromRGB(138,43,226),0.7)
+        local core=makeCircle(Container,0.85,Color3.fromRGB(200,100,255),0.1)
+        makeIcon(core,Color3.fromRGB(255,255,255),0.5)
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() local s=1.25+math.sin(t2*3)*0.1; glow.Size=UDim2.new(s,0,s,0); glow.BackgroundTransparency=0.6+math.sin(t2*2)*0.15 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "C" then
+        local d=Instance.new("Frame",Container); d.AnchorPoint=Vector2.new(0.5,0.5); d.Position=UDim2.new(0.5,0,0.5,0)
+        d.Size=UDim2.new(0.7,0,0.7,0); d.BackgroundColor3=Color3.fromRGB(30,30,50); d.BorderSizePixel=0; d.Rotation=45
+        Instance.new("UICorner",d).CornerRadius=UDim.new(0.15,0)
+        local ds=makeStroke(d,nil,2); local dg=Instance.new("UIGradient",ds)
+        dg.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(0,200,255)),ColorSequenceKeypoint.new(0.5,Color3.fromRGB(200,0,255)),ColorSequenceKeypoint.new(1,Color3.fromRGB(255,100,200))})
+        local ic=makeIcon(d,Color3.fromRGB(200,150,255),0.6,5); ic.Rotation=-45
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end
+            pcall(function() dg.Rotation=(dg.Rotation+60*dt)%360 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "D" then
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(5,20,10))
+        makeStroke(bg,Color3.fromRGB(0,180,80),2)
+        local sw=Instance.new("Frame",bg); sw.AnchorPoint=Vector2.new(0.5,1); sw.Position=UDim2.new(0.5,0,0.5,0)
+        sw.Size=UDim2.new(0,2,0.45,0); sw.BackgroundColor3=Color3.fromRGB(0,255,100); sw.BorderSizePixel=0; sw.ZIndex=4
+        makeIcon(bg,Color3.fromRGB(0,255,120),0.35,5)
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end
+            pcall(function() sw.Rotation=(sw.Rotation+90*dt)%360 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "E" then
+        local outer=makeCircle(Container,0.95,nil,1)
+        local fs=makeStroke(outer,nil,3); local fg=Instance.new("UIGradient",fs)
+        fg.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,50,0)),ColorSequenceKeypoint.new(0.5,Color3.fromRGB(255,255,50)),ColorSequenceKeypoint.new(1,Color3.fromRGB(255,50,0))})
+        local co=makeCircle(Container,0.75,Color3.fromRGB(15,5,0)); makeIcon(co,Color3.fromRGB(255,180,50),0.5)
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end
+            pcall(function() fg.Rotation=(fg.Rotation+120*dt)%360; fs.Thickness=2.5+math.sin(tick()*8)*0.8 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "F" then
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(5,2,15)); makeStroke(bg,Color3.fromRGB(100,50,200),1.5)
+        local arms={}
+        for i=1,3 do local a=Instance.new("Frame",bg); a.AnchorPoint=Vector2.new(0.5,1); a.Position=UDim2.new(0.5,0,0.5,0)
+            a.Size=UDim2.new(0.08,0,0.4,0); a.BackgroundColor3=Color3.fromRGB(200,100,255); a.BackgroundTransparency=0.4
+            a.BorderSizePixel=0; a.Rotation=120*(i-1); Instance.new("UICorner",a).CornerRadius=UDim.new(0.5,0); table.insert(arms,a) end
+        makeIcon(bg,Color3.fromRGB(255,255,255),0.3,6)
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() for j,a in ipairs(arms) do a.Rotation=120*(j-1)+t2*25 end end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "G" then
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(5,5,20)); makeStroke(bg,Color3.fromRGB(0,150,255),1.5)
+        local orbs={}
+        for i=1,3 do local o=Instance.new("Frame",bg); o.AnchorPoint=Vector2.new(0.5,0.5); o.Position=UDim2.new(0.5,0,0.5,0)
+            o.Size=UDim2.new(0.85,0,0.45,0); o.BackgroundTransparency=1; o.Rotation=60*(i-1)
+            Instance.new("UICorner",o).CornerRadius=UDim.new(1,0); makeStroke(o,Color3.fromRGB(0,180,255),1); table.insert(orbs,o) end
+        makeCircle(bg,0.2,Color3.fromRGB(0,120,255)).ZIndex=5; makeIcon(bg,Color3.fromRGB(255,255,255),0.3,6)
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() for j,o in ipairs(orbs) do o.Rotation=60*(j-1)+t2*20 end end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "H" then
+        local bg=Instance.new("Frame",Container); bg.AnchorPoint=Vector2.new(0.5,0.5); bg.Position=UDim2.new(0.5,0,0.5,0)
+        bg.Size=UDim2.new(0.95,0,0.95,0); bg.BackgroundColor3=Color3.fromRGB(5,15,5); bg.BorderSizePixel=0
+        Instance.new("UICorner",bg).CornerRadius=UDim.new(0.2,0); makeStroke(bg,Color3.fromRGB(0,200,0),1.5)
+        local h=Instance.new("TextLabel",bg); h.AnchorPoint=Vector2.new(0.5,0.5); h.Position=UDim2.new(0.5,0,0.5,0)
+        h.Size=UDim2.new(0.4,0,0.4,0); h.BackgroundTransparency=1; h.Text="♥"; h.TextColor3=Color3.fromRGB(0,255,0)
+        h.TextScaled=true; h.Font=Enum.Font.GothamBold; h.ZIndex=4
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() h.TextTransparency=0.3+math.sin(t2*5)*0.3 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "I" then
+        local outer=makeCircle(Container,0.95,Color3.fromRGB(15,15,15)); makeStroke(outer,Color3.fromRGB(200,200,200),2)
+        local spin=Instance.new("Frame",outer); spin.AnchorPoint=Vector2.new(0.5,0.5); spin.Position=UDim2.new(0.5,0,0.5,0)
+        spin.Size=UDim2.new(1,0,1,0); spin.BackgroundTransparency=1
+        local wh=Instance.new("Frame",spin); wh.AnchorPoint=Vector2.new(0.5,0.5); wh.Position=UDim2.new(0.5,0,0.25,0)
+        wh.Size=UDim2.new(0.9,0,0.45,0); wh.BackgroundColor3=Color3.fromRGB(220,220,220); wh.BorderSizePixel=0
+        Instance.new("UICorner",wh).CornerRadius=UDim.new(1,0)
+        local bk=Instance.new("Frame",spin); bk.AnchorPoint=Vector2.new(0.5,0.5); bk.Position=UDim2.new(0.5,0,0.75,0)
+        bk.Size=UDim2.new(0.9,0,0.45,0); bk.BackgroundColor3=Color3.fromRGB(20,20,20); bk.BorderSizePixel=0
+        Instance.new("UICorner",bk).CornerRadius=UDim.new(1,0)
+        makeIcon(outer,Color3.fromRGB(150,150,150),0.25,8)
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end
+            pcall(function() spin.Rotation=(spin.Rotation+45*dt)%360 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "J" then
+        local bg=Instance.new("Frame",Container); bg.AnchorPoint=Vector2.new(0.5,0.5); bg.Position=UDim2.new(0.5,0,0.5,0)
+        bg.Size=UDim2.new(0.95,0,0.95,0); bg.BackgroundColor3=Color3.fromRGB(0,0,0); bg.BorderSizePixel=0; bg.ClipsDescendants=true
+        Instance.new("UICorner",bg).CornerRadius=UDim.new(0.15,0); makeStroke(bg,Color3.fromRGB(0,255,0),1.5)
+        for i=1,15 do local l=Instance.new("TextLabel",bg)
+            l.Position=UDim2.new(math.random(0,90)/100,0,math.random(0,90)/100,0); l.Size=UDim2.new(0.2,0,0.2,0)
+            l.BackgroundTransparency=1; l.Text=math.random(0,1)==0 and "0" or "1"
+            l.TextColor3=Color3.fromRGB(0,math.random(100,255),0); l.TextTransparency=math.random(30,80)/100
+            l.TextScaled=true; l.Font=Enum.Font.Code; l.ZIndex=2 end
+        makeIcon(bg,Color3.fromRGB(0,255,0),0.4,5)
+        ToggleBtn.MouseButton1Click:Connect(function() if hasDragged then return end
+            for _=1,3 do bg.Position=UDim2.new(0.5,math.random(-3,3),0.5,math.random(-3,3)); task.wait(0.03) end
+            bg.Position=UDim2.new(0.5,0,0.5,0); doToggle() end)
+
+    elseif key == "K" then
+        local body=makeCircle(Container,0.95,Color3.fromRGB(50,40,25)); makeStroke(body,Color3.fromRGB(200,170,100),2.5)
+        makeCircle(body,0.82,Color3.fromRGB(240,230,200))
+        local needle=Instance.new("Frame",body); needle.AnchorPoint=Vector2.new(0.5,0.5); needle.Position=UDim2.new(0.5,0,0.5,0)
+        needle.Size=UDim2.new(0.08,0,0.7,0); needle.BackgroundColor3=Color3.fromRGB(200,30,30); needle.BorderSizePixel=0; needle.ZIndex=4
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end
+            pcall(function() local cam=Workspace.CurrentCamera; if cam then local lv=cam.CFrame.LookVector
+                local a=math.deg(math.atan2(lv.X,lv.Z)); local diff=((a-needle.Rotation+180)%360)-180
+                needle.Rotation=needle.Rotation+diff*math.min(dt*8,1) end end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "L" then
+        local aura=makeCircle(Container,1.2,Color3.fromRGB(255,165,0),0.7)
+        local ball=makeCircle(Container,0.88,Color3.fromRGB(255,160,20))
+        local bg2=Instance.new("UIGradient",ball)
+        bg2.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,200,50)),ColorSequenceKeypoint.new(1,Color3.fromRGB(200,100,0))})
+        bg2.Rotation=135
+        for _,p in ipairs({{0.38,0.42},{0.62,0.42},{0.38,0.62},{0.62,0.62}}) do
+            local s=Instance.new("TextLabel",ball); s.AnchorPoint=Vector2.new(0.5,0.5); s.Position=UDim2.new(p[1],0,p[2],0)
+            s.Size=UDim2.new(0.18,0,0.18,0); s.BackgroundTransparency=1; s.Text="★"
+            s.TextColor3=Color3.fromRGB(180,30,0); s.TextScaled=true; s.ZIndex=4 end
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() local s=1.15+math.sin(t2*3)*0.1; aura.Size=UDim2.new(s,0,s,0)
+                aura.BackgroundTransparency=0.6+math.sin(t2*2)*0.15; bg2.Rotation=135+math.sin(t2)*20 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "M" then
+        local bg=makeCircle(Container,0.92,Color3.fromRGB(5,10,25))
+        local ws=makeStroke(bg,nil,2); local wg=Instance.new("UIGradient",ws)
+        wg.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(0,100,255)),ColorSequenceKeypoint.new(0.5,Color3.fromRGB(100,200,255)),ColorSequenceKeypoint.new(1,Color3.fromRGB(0,150,255))})
+        local bc=Instance.new("Frame",bg); bc.AnchorPoint=Vector2.new(0.5,0.5); bc.Position=UDim2.new(0.5,0,0.5,0)
+        bc.Size=UDim2.new(1,0,1,0); bc.BackgroundTransparency=1
+        for i=1,6 do local b=Instance.new("Frame",bc); b.AnchorPoint=Vector2.new(0.5,1); b.Position=UDim2.new(0.5,0,0.5,0)
+            b.Size=UDim2.new(0.06,0,0.4,0); b.BackgroundColor3=Color3.fromRGB(0,150,255); b.BackgroundTransparency=0.3
+            b.BorderSizePixel=0; b.Rotation=60*(i-1); Instance.new("UICorner",b).CornerRadius=UDim.new(0.5,0) end
+        local k=Instance.new("TextLabel",bg); k.AnchorPoint=Vector2.new(0.5,0.5); k.Position=UDim2.new(0.5,0,0.5,0)
+        k.Size=UDim2.new(0.4,0,0.4,0); k.BackgroundTransparency=1; k.Text="水"; k.TextColor3=Color3.fromRGB(100,200,255)
+        k.TextScaled=true; k.Font=Enum.Font.GothamBold; k.ZIndex=5
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end
+            pcall(function() bc.Rotation=(bc.Rotation+60*dt)%360; wg.Rotation=(wg.Rotation+80*dt)%360 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "N" then
+        local flag=makeCircle(Container,0.95,Color3.fromRGB(10,10,10)); makeStroke(flag,Color3.fromRGB(200,30,30),2.5)
+        local skull=Instance.new("Frame",flag); skull.AnchorPoint=Vector2.new(0.5,0.5); skull.Position=UDim2.new(0.5,0,0.42,0)
+        skull.Size=UDim2.new(0.4,0,0.35,0); skull.BackgroundColor3=Color3.fromRGB(240,240,240); skull.BorderSizePixel=0
+        Instance.new("UICorner",skull).CornerRadius=UDim.new(0.4,0)
+        for _,xp in ipairs({0.32,0.68}) do local eye=Instance.new("Frame",skull); eye.AnchorPoint=Vector2.new(0.5,0.5)
+            eye.Position=UDim2.new(xp,0,0.45,0); eye.Size=UDim2.new(0.2,0,0.25,0); eye.BackgroundColor3=Color3.fromRGB(10,10,10)
+            eye.BorderSizePixel=0; eye.ZIndex=3; Instance.new("UICorner",eye).CornerRadius=UDim.new(1,0) end
+        local hat=Instance.new("Frame",flag); hat.AnchorPoint=Vector2.new(0.5,0.5); hat.Position=UDim2.new(0.5,0,0.26,0)
+        hat.Size=UDim2.new(0.55,0,0.1,0); hat.BackgroundColor3=Color3.fromRGB(230,200,100); hat.BorderSizePixel=0; hat.ZIndex=4
+        Instance.new("UICorner",hat).CornerRadius=UDim.new(0.5,0)
+        for _,r in ipairs({35,-35}) do local bone=Instance.new("Frame",flag); bone.AnchorPoint=Vector2.new(0.5,0.5)
+            bone.Position=UDim2.new(0.5,0,0.7,0); bone.Size=UDim2.new(0.6,0,0.06,0); bone.BackgroundColor3=Color3.fromRGB(220,220,220)
+            bone.BorderSizePixel=0; bone.Rotation=r; bone.ZIndex=2; Instance.new("UICorner",bone).CornerRadius=UDim.new(0.5,0) end
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() flag.Rotation=math.sin(t2*2)*3 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "O" then
+        local glow=makeCircle(Container,1.25,Color3.fromRGB(80,150,255),0.7)
+        local rasen=makeCircle(Container,0.85,Color3.fromRGB(100,180,255))
+        local rg=Instance.new("UIGradient",rasen)
+        rg.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(150,200,255)),ColorSequenceKeypoint.new(1,Color3.fromRGB(50,120,255))})
+        local sc=Instance.new("Frame",rasen); sc.AnchorPoint=Vector2.new(0.5,0.5); sc.Position=UDim2.new(0.5,0,0.5,0)
+        sc.Size=UDim2.new(1,0,1,0); sc.BackgroundTransparency=1
+        for i=1,4 do local sp=makeCircle(sc,0.7-i*0.1,nil,1); makeStroke(sp,Color3.fromRGB(180,220,255),1.5) end
+        makeCircle(rasen,0.25,Color3.fromRGB(230,240,255),0.1).ZIndex=5
+        makeIcon(rasen,Color3.fromRGB(255,255,255),0.25,6)
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() sc.Rotation=(sc.Rotation+200*dt)%360; rg.Rotation=(rg.Rotation+150*dt)%360
+                local s=1.2+math.sin(t2*4)*0.1; glow.Size=UDim2.new(s,0,s,0) end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "P" then
+        local shield=Instance.new("Frame",Container); shield.AnchorPoint=Vector2.new(0.5,0.5); shield.Position=UDim2.new(0.5,0,0.5,0)
+        shield.Size=UDim2.new(0.95,0,0.95,0); shield.BackgroundColor3=Color3.fromRGB(20,35,60); shield.BorderSizePixel=0
+        Instance.new("UICorner",shield).CornerRadius=UDim.new(0.15,0); makeStroke(shield,Color3.fromRGB(200,180,100),2.5)
+        local lw=makeRect(shield,UDim2.new(0.3,0,0.4,0),UDim2.new(0.18,0,0.45,0),Color3.fromRGB(180,200,230),15)
+        Instance.new("UICorner",lw).CornerRadius=UDim.new(0.3,0)
+        local rw=makeRect(shield,UDim2.new(0.7,0,0.4,0),UDim2.new(0.18,0,0.45,0),Color3.fromRGB(30,50,80),-15)
+        Instance.new("UICorner",rw).CornerRadius=UDim.new(0.3,0)
+        local kj=Instance.new("TextLabel",shield); kj.AnchorPoint=Vector2.new(0.5,0.5); kj.Position=UDim2.new(0.5,0,0.85,0)
+        kj.Size=UDim2.new(0.6,0,0.12,0); kj.BackgroundTransparency=1; kj.Text="自由"
+        kj.TextColor3=Color3.fromRGB(200,180,100); kj.TextScaled=true; kj.Font=Enum.Font.GothamBold; kj.ZIndex=5
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "Q" then
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(5,5,20)); makeStroke(bg,Color3.fromRGB(100,150,255),2)
+        for i=1,5 do local r=makeCircle(bg,0.9-i*0.12,nil,1); makeStroke(r,Color3.fromRGB(120+i*20,150+i*15,255),1) end
+        makeCircle(bg,0.2,Color3.fromRGB(200,220,255)).ZIndex=5
+        local eye=Instance.new("TextLabel",bg); eye.AnchorPoint=Vector2.new(0.5,0.5); eye.Position=UDim2.new(0.5,0,0.5,0)
+        eye.Size=UDim2.new(0.35,0,0.35,0); eye.BackgroundTransparency=1; eye.Text="∞"
+        eye.TextColor3=Color3.fromRGB(150,200,255); eye.TextScaled=true; eye.Font=Enum.Font.GothamBold; eye.ZIndex=6
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "R" then
+        local book=Instance.new("Frame",Container); book.AnchorPoint=Vector2.new(0.5,0.5); book.Position=UDim2.new(0.5,0,0.5,0)
+        book.Size=UDim2.new(0.85,0,0.95,0); book.BackgroundColor3=Color3.fromRGB(15,15,15); book.BorderSizePixel=0
+        Instance.new("UICorner",book).CornerRadius=UDim.new(0.08,0); makeStroke(book,Color3.fromRGB(80,80,80),2)
+        local t1=Instance.new("TextLabel",book); t1.AnchorPoint=Vector2.new(0.5,0); t1.Position=UDim2.new(0.5,0,0.1,0)
+        t1.Size=UDim2.new(0.8,0,0.18,0); t1.BackgroundTransparency=1; t1.Text="DEATH"
+        t1.TextColor3=Color3.fromRGB(200,200,200); t1.TextScaled=true; t1.Font=Enum.Font.GothamBold; t1.ZIndex=3
+        local t22=Instance.new("TextLabel",book); t22.AnchorPoint=Vector2.new(0.5,0); t22.Position=UDim2.new(0.5,0,0.3,0)
+        t22.Size=UDim2.new(0.8,0,0.18,0); t22.BackgroundTransparency=1; t22.Text="NOTE"
+        t22.TextColor3=Color3.fromRGB(200,200,200); t22.TextScaled=true; t22.Font=Enum.Font.GothamBold; t22.ZIndex=3
+        local cr=Instance.new("TextLabel",book); cr.AnchorPoint=Vector2.new(0.5,0.5); cr.Position=UDim2.new(0.5,0,0.7,0)
+        cr.Size=UDim2.new(0.3,0,0.3,0); cr.BackgroundTransparency=1; cr.Text="†"
+        cr.TextColor3=Color3.fromRGB(150,150,150); cr.TextScaled=true; cr.Font=Enum.Font.GothamBold; cr.ZIndex=3
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "S" then
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(10,10,10)); makeStroke(bg,Color3.fromRGB(255,255,255),2)
+        local mask=makeCircle(bg,0.7,Color3.fromRGB(240,240,230)); mask.ZIndex=3
+        for _,xp in ipairs({0.32,0.68}) do local eye=Instance.new("Frame",mask); eye.AnchorPoint=Vector2.new(0.5,0.5)
+            eye.Position=UDim2.new(xp,0,0.4,0); eye.Size=UDim2.new(0.22,0,0.15,0); eye.BackgroundColor3=Color3.fromRGB(255,0,0)
+            eye.BorderSizePixel=0; eye.ZIndex=4; Instance.new("UICorner",eye).CornerRadius=UDim.new(0.3,0) end
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "T" then
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(20,5,10)); makeStroke(bg,Color3.fromRGB(200,50,80),2)
+        for _,ep in ipairs({{0.3,0.32},{0.7,0.32},{0.3,0.52},{0.7,0.52}}) do
+            local eye=Instance.new("Frame",bg); eye.AnchorPoint=Vector2.new(0.5,0.5)
+            eye.Position=UDim2.new(ep[1],0,ep[2],0); eye.Size=UDim2.new(0.18,0,0.1,0)
+            eye.BackgroundColor3=Color3.fromRGB(255,200,50); eye.BorderSizePixel=0; eye.ZIndex=3
+            Instance.new("UICorner",eye).CornerRadius=UDim.new(0.5,0) end
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "U" then
+        local chip=Instance.new("Frame",Container); chip.AnchorPoint=Vector2.new(0.5,0.5); chip.Position=UDim2.new(0.5,0,0.5,0)
+        chip.Size=UDim2.new(0.9,0,0.9,0); chip.BackgroundColor3=Color3.fromRGB(10,15,25); chip.BorderSizePixel=0
+        Instance.new("UICorner",chip).CornerRadius=UDim.new(0.1,0); makeStroke(chip,Color3.fromRGB(255,200,0),2)
+        local die=makeCircle(chip,0.45,Color3.fromRGB(20,30,50)); die.ZIndex=3; makeStroke(die,Color3.fromRGB(255,200,0),1)
+        makeIcon(die,Color3.fromRGB(255,200,0),0.6,5)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "V" then
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(5,10,20)); makeStroke(bg,Color3.fromRGB(0,200,255),1.5)
+        local hrs={}
+        for i=1,4 do local hr=Instance.new("Frame",bg); hr.AnchorPoint=Vector2.new(0.5,0.5); hr.Position=UDim2.new(0.5,0,0.5,0)
+            hr.Size=UDim2.new(0.8-i*0.05,0,0.3,0); hr.BackgroundTransparency=1; hr.Rotation=i*25
+            Instance.new("UICorner",hr).CornerRadius=UDim.new(1,0); makeStroke(hr,Color3.fromRGB(0,200+i*10,255),1)
+            table.insert(hrs,hr) end
+        makeIcon(bg,Color3.fromRGB(0,220,255),0.3,6)
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() for j,hr in ipairs(hrs) do hr.Rotation=j*25+t2*(15+j*5) end end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "W" then
+        local bg=Instance.new("Frame",Container); bg.AnchorPoint=Vector2.new(0.5,0.5); bg.Position=UDim2.new(0.5,0,0.5,0)
+        bg.Size=UDim2.new(0.95,0,0.95,0); bg.BackgroundColor3=Color3.fromRGB(5,5,15); bg.BorderSizePixel=0
+        Instance.new("UICorner",bg).CornerRadius=UDim.new(0.12,0)
+        local ns=makeStroke(bg,nil,2); local ng=Instance.new("UIGradient",ns)
+        ng.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,0,100)),ColorSequenceKeypoint.new(0.5,Color3.fromRGB(0,200,255)),ColorSequenceKeypoint.new(1,Color3.fromRGB(255,0,255))})
+        makeIcon(bg,Color3.fromRGB(0,200,255),0.35,5)
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end
+            pcall(function() ng.Rotation=(ng.Rotation+40*dt)%360 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "X" then
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(5,5,15)); makeStroke(bg,Color3.fromRGB(100,0,255),1.5)
+        local np2={{0.2,0.2},{0.5,0.15},{0.8,0.2},{0.15,0.5},{0.5,0.5},{0.85,0.5},{0.2,0.8},{0.5,0.85},{0.8,0.8}}
+        local nodes={}
+        for _,npp in ipairs(np2) do local n=Instance.new("Frame",bg); n.AnchorPoint=Vector2.new(0.5,0.5)
+            n.Position=UDim2.new(npp[1],0,npp[2],0); n.Size=UDim2.new(0,6,0,6)
+            n.BackgroundColor3=Color3.fromRGB(150,100,255); n.BorderSizePixel=0; n.ZIndex=4
+            Instance.new("UICorner",n).CornerRadius=UDim.new(1,0); table.insert(nodes,n) end
+        makeIcon(bg,Color3.fromRGB(150,100,255),0.25,6)
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() for j,n in ipairs(nodes) do n.BackgroundTransparency=math.sin(t2*3+j)*0.3 end end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "Y" then
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(0,0,5)); makeStroke(bg,Color3.fromRGB(0,255,200),2)
+        local prs={}
+        for i=1,6 do local pr=makeCircle(bg,0.9-i*0.08,nil,1); makeStroke(pr,Color3.fromRGB(0,200+i*10,200-i*20),1.5); table.insert(prs,pr) end
+        makeCircle(bg,0.2,Color3.fromRGB(0,255,200),0.3).ZIndex=5; makeIcon(bg,Color3.fromRGB(0,255,200),0.25,6)
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() for j,pr in ipairs(prs) do pr.Rotation=(pr.Rotation+(5+j*10)*dt)%360 end end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "Z" then
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(20,10,15)); makeStroke(bg,Color3.fromRGB(255,150,180),2)
+        local petals={}
+        for i=1,8 do local p=Instance.new("TextLabel",bg); p.AnchorPoint=Vector2.new(0.5,0.5)
+            p.Position=UDim2.new(math.random(15,85)/100,0,math.random(15,85)/100,0)
+            p.Size=UDim2.new(0.15,0,0.15,0); p.BackgroundTransparency=1; p.Text="🌸"; p.TextScaled=true; p.ZIndex=3
+            table.insert(petals,{label=p,speed=math.random(20,60)/100,drift=math.random(-30,30)/100}) end
+        local kk=Instance.new("TextLabel",bg); kk.AnchorPoint=Vector2.new(0.5,0.5); kk.Position=UDim2.new(0.5,0,0.5,0)
+        kk.Size=UDim2.new(0.4,0,0.4,0); kk.BackgroundTransparency=1; kk.Text="桜"
+        kk.TextColor3=Color3.fromRGB(255,180,200); kk.TextScaled=true; kk.Font=Enum.Font.GothamBold; kk.ZIndex=5
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() for _,p in ipairs(petals) do
+                local ny=p.label.Position.Y.Scale+p.speed*dt; local nx=p.label.Position.X.Scale+p.drift*dt
+                if ny>0.9 then ny=0.1; nx=math.random(15,85)/100 end
+                if nx<0.1 or nx>0.9 then nx=0.5 end
+                p.label.Position=UDim2.new(nx,0,ny,0); p.label.Rotation=(p.label.Rotation+30*dt)%360
+            end end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "01" then -- Eternal Mangekyo
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(10,0,0)); makeStroke(bg,Color3.fromRGB(255,0,0),2)
+        local iris=makeCircle(bg,0.8,Color3.fromRGB(180,0,0)); iris.ZIndex=2
+        local pc2=Instance.new("Frame",iris); pc2.AnchorPoint=Vector2.new(0.5,0.5); pc2.Position=UDim2.new(0.5,0,0.5,0)
+        pc2.Size=UDim2.new(1,0,1,0); pc2.BackgroundTransparency=1; pc2.ZIndex=3
+        for i=1,3 do local bl=Instance.new("Frame",pc2); bl.AnchorPoint=Vector2.new(0.5,1); bl.Position=UDim2.new(0.5,0,0.5,0)
+            bl.Size=UDim2.new(0.15,0,0.38,0); bl.BackgroundColor3=Color3.fromRGB(10,10,10); bl.BorderSizePixel=0
+            bl.Rotation=120*(i-1); bl.ZIndex=4; Instance.new("UICorner",bl).CornerRadius=UDim.new(0.5,0) end
+        makeCircle(iris,0.22,Color3.fromRGB(5,5,5)).ZIndex=6
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() pc2.Rotation=(pc2.Rotation+30*dt)%360; local p=0.78+math.sin(t2*2)*0.03
+                iris.Size=UDim2.new(p,0,p,0) end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "02" then -- Gear 5 Nika
+        local a1=makeCircle(Container,1.3,Color3.fromRGB(255,255,255),0.6)
+        local bg=makeCircle(Container,0.92,Color3.fromRGB(255,250,240))
+        makeStroke(bg,Color3.fromRGB(255,200,50),2.5)
+        local sm=Instance.new("TextLabel",bg); sm.AnchorPoint=Vector2.new(0.5,0.5); sm.Position=UDim2.new(0.5,0,0.45,0)
+        sm.Size=UDim2.new(0.6,0,0.4,0); sm.BackgroundTransparency=1; sm.Text="😄"; sm.TextScaled=true; sm.ZIndex=4
+        local nk=Instance.new("TextLabel",bg); nk.AnchorPoint=Vector2.new(0.5,0.5); nk.Position=UDim2.new(0.5,0,0.82,0)
+        nk.Size=UDim2.new(0.7,0,0.15,0); nk.BackgroundTransparency=1; nk.Text="NIKA"
+        nk.TextColor3=Color3.fromRGB(200,150,0); nk.TextScaled=true; nk.Font=Enum.Font.GothamBold; nk.ZIndex=4
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() local b=math.abs(math.sin(t2*4))*0.08; a1.Size=UDim2.new(1.25+b,0,1.25+b,0)
+                bg.Rotation=math.sin(t2*5)*3 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "03" then -- Ultra Instinct
+        makeCircle(Container,1.35,Color3.fromRGB(200,200,230),0.75)
+        makeCircle(Container,1.2,Color3.fromRGB(180,190,220),0.6)
+        local bg=makeCircle(Container,0.9,Color3.fromRGB(15,15,30)); makeStroke(bg,Color3.fromRGB(200,210,240),2)
+        local kj=Instance.new("TextLabel",bg); kj.AnchorPoint=Vector2.new(0.5,0.5); kj.Position=UDim2.new(0.5,0,0.5,0)
+        kj.Size=UDim2.new(0.5,0,0.5,0); kj.BackgroundTransparency=1; kj.Text="極"
+        kj.TextColor3=Color3.fromRGB(200,210,240); kj.TextScaled=true; kj.Font=Enum.Font.GothamBold; kj.ZIndex=5
+        makeIcon(bg,Color3.fromRGB(200,210,240),0.25,6)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "04" then -- Cursed Seal
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(60,50,40)); makeStroke(bg,Color3.fromRGB(80,50,120),2)
+        local skin=makeCircle(bg,0.85,Color3.fromRGB(200,170,140)); skin.ZIndex=2
+        for i=1,8 do local a=math.rad((360/8)*(i-1))
+            local mk=Instance.new("Frame",skin); mk.AnchorPoint=Vector2.new(0.5,1); mk.Position=UDim2.new(0.5+math.cos(a)*0.15,0,0.5+math.sin(a)*0.15,0)
+            mk.Size=UDim2.new(0.08,0,0.25,0); mk.BackgroundColor3=Color3.fromRGB(30,20,40); mk.BorderSizePixel=0
+            mk.Rotation=math.deg(a)+90; mk.ZIndex=3; Instance.new("UICorner",mk).CornerRadius=UDim.new(0.4,0) end
+        local kj=Instance.new("TextLabel",skin); kj.AnchorPoint=Vector2.new(0.5,0.5); kj.Position=UDim2.new(0.5,0,0.5,0)
+        kj.Size=UDim2.new(0.35,0,0.35,0); kj.BackgroundTransparency=1; kj.Text="呪"
+        kj.TextColor3=Color3.fromRGB(80,30,100); kj.TextScaled=true; kj.Font=Enum.Font.GothamBold; kj.ZIndex=5
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "05" then -- Titan Core
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(40,25,15)); makeStroke(bg,Color3.fromRGB(255,150,50),2.5)
+        local core=makeCircle(bg,0.3,Color3.fromRGB(255,200,50)); core.ZIndex=4
+        makeCircle(core,0.5,Color3.fromRGB(255,100,0)).ZIndex=5
+        makeIcon(bg,Color3.fromRGB(255,200,100),0.25,6)
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() local cp=0.28+math.sin(t2*3)*0.04; core.Size=UDim2.new(cp,0,cp,0) end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "06" then -- Plasma Reactor
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(5,5,15)); makeStroke(bg,Color3.fromRGB(0,200,255),2)
+        for i=1,3 do local r=makeCircle(bg,0.85-i*0.12,nil,1); local rs=makeStroke(r,Color3.fromRGB(0,150+i*30,255),1.5) end
+        local plasma=makeCircle(bg,0.25,Color3.fromRGB(0,200,255),0.2); plasma.ZIndex=4
+        makeIcon(bg,Color3.fromRGB(0,220,255),0.3,5)
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() local ps=0.22+math.sin(t2*5)*0.04; plasma.Size=UDim2.new(ps,0,ps,0) end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "07" then -- Binary Storm
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(0,0,0)); bg.ClipsDescendants=true
+        makeStroke(bg,Color3.fromRGB(0,255,100),2)
+        for i=1,20 do local l=Instance.new("TextLabel",bg)
+            l.Position=UDim2.new(math.random(5,95)/100,0,math.random(5,95)/100,0); l.Size=UDim2.new(0.12,0,0.1,0)
+            l.BackgroundTransparency=1; l.Text=math.random(0,1)==0 and "0" or "1"
+            l.TextColor3=Color3.fromRGB(0,math.random(150,255),math.random(50,100)); l.TextTransparency=math.random(20,70)/100
+            l.TextScaled=true; l.Font=Enum.Font.Code; l.ZIndex=2 end
+        local disp=makeCircle(bg,0.35,Color3.fromRGB(0,30,10)); disp.ZIndex=4
+        makeStroke(disp,Color3.fromRGB(0,200,80),1)
+        makeIcon(disp,Color3.fromRGB(0,255,100),0.5,5)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "08" then -- Void Singularity
+        for i=5,1,-1 do makeCircle(Container,0.2+i*0.15,Color3.fromRGB(i*8,0,i*15),0.1+i*0.1).ZIndex=6-i end
+        local void=makeCircle(Container,0.2,Color3.fromRGB(0,0,0)); void.ZIndex=6
+        makeStroke(void,Color3.fromRGB(100,0,200),1.5); makeIcon(void,Color3.fromRGB(150,50,255),0.6,7)
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() local vp=0.18+math.sin(t2*3)*0.03; void.Size=UDim2.new(vp,0,vp,0) end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "09" then -- Chrome Sentinel
+        local bg=Instance.new("Frame",Container); bg.AnchorPoint=Vector2.new(0.5,0.5); bg.Position=UDim2.new(0.5,0,0.5,0)
+        bg.Size=UDim2.new(0.95,0,0.95,0); bg.BackgroundColor3=Color3.fromRGB(40,40,50); bg.BorderSizePixel=0
+        Instance.new("UICorner",bg).CornerRadius=UDim.new(0.2,0)
+        local bgG=Instance.new("UIGradient",bg)
+        bgG.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(60,60,70)),ColorSequenceKeypoint.new(0.5,Color3.fromRGB(150,150,160)),ColorSequenceKeypoint.new(1,Color3.fromRGB(60,60,70))})
+        makeStroke(bg,Color3.fromRGB(180,180,200),2)
+        local visor=Instance.new("Frame",bg); visor.AnchorPoint=Vector2.new(0.5,0.5); visor.Position=UDim2.new(0.5,0,0.42,0)
+        visor.Size=UDim2.new(0.7,0,0.08,0); visor.BackgroundColor3=Color3.fromRGB(0,200,255); visor.BorderSizePixel=0; visor.ZIndex=3
+        Instance.new("UICorner",visor).CornerRadius=UDim.new(0.5,0)
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end
+            pcall(function() bgG.Rotation=(bgG.Rotation+20*dt)%360 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "10" then -- Rinnegan Eye
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(60,50,70)); makeStroke(bg,Color3.fromRGB(150,120,180),2)
+        local iris=makeCircle(bg,0.8,Color3.fromRGB(120,80,160)); iris.ZIndex=2
+        for i=1,5 do local rp=makeCircle(iris,0.9-i*0.13,nil,1); rp.ZIndex=3; makeStroke(rp,Color3.fromRGB(40,20,60),1.5) end
+        local pupil=makeCircle(iris,0.15,Color3.fromRGB(10,5,15)); pupil.ZIndex=5
+        makeIcon(pupil,Color3.fromRGB(150,100,200),0.5,7)
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() local r=110+math.sin(t2*1.5)*20; iris.BackgroundColor3=Color3.fromRGB(r,r*0.65,r*1.3) end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "11" then -- SpongeBob
+        local bg=Instance.new("Frame",Container); bg.AnchorPoint=Vector2.new(0.5,0.5); bg.Position=UDim2.new(0.5,0,0.5,0)
+        bg.Size=UDim2.new(0.85,0,0.95,0); bg.BackgroundColor3=Color3.fromRGB(255,230,50); bg.BorderSizePixel=0
+        Instance.new("UICorner",bg).CornerRadius=UDim.new(0.1,0); makeStroke(bg,Color3.fromRGB(200,180,30),2)
+        -- Eyes
+        for _,xp in ipairs({0.35,0.65}) do
+            local eyeW=Instance.new("Frame",bg); eyeW.AnchorPoint=Vector2.new(0.5,0.5); eyeW.Position=UDim2.new(xp,0,0.35,0)
+            eyeW.Size=UDim2.new(0.28,0,0.25,0); eyeW.BackgroundColor3=Color3.fromRGB(255,255,255); eyeW.BorderSizePixel=0; eyeW.ZIndex=3
+            Instance.new("UICorner",eyeW).CornerRadius=UDim.new(1,0)
+            local pupil=Instance.new("Frame",eyeW); pupil.AnchorPoint=Vector2.new(0.5,0.5); pupil.Position=UDim2.new(0.5,0,0.5,0)
+            pupil.Size=UDim2.new(0.4,0,0.5,0); pupil.BackgroundColor3=Color3.fromRGB(50,150,255); pupil.BorderSizePixel=0; pupil.ZIndex=4
+            Instance.new("UICorner",pupil).CornerRadius=UDim.new(1,0)
+            local dot=Instance.new("Frame",pupil); dot.AnchorPoint=Vector2.new(0.5,0.5); dot.Position=UDim2.new(0.5,0,0.5,0)
+            dot.Size=UDim2.new(0.5,0,0.5,0); dot.BackgroundColor3=Color3.fromRGB(10,10,10); dot.BorderSizePixel=0; dot.ZIndex=5
+            Instance.new("UICorner",dot).CornerRadius=UDim.new(1,0) end
+        -- Nose
+        local nose=Instance.new("Frame",bg); nose.AnchorPoint=Vector2.new(0.5,0.5); nose.Position=UDim2.new(0.5,0,0.52,0)
+        nose.Size=UDim2.new(0.1,0,0.12,0); nose.BackgroundColor3=Color3.fromRGB(240,200,30); nose.BorderSizePixel=0; nose.ZIndex=3
+        Instance.new("UICorner",nose).CornerRadius=UDim.new(1,0)
+        -- Smile
+        local smile=Instance.new("Frame",bg); smile.AnchorPoint=Vector2.new(0.5,0.5); smile.Position=UDim2.new(0.5,0,0.7,0)
+        smile.Size=UDim2.new(0.55,0,0.08,0); smile.BackgroundColor3=Color3.fromRGB(10,10,10); smile.BorderSizePixel=0; smile.ZIndex=3
+        Instance.new("UICorner",smile).CornerRadius=UDim.new(0.5,0)
+        -- Teeth
+        local teeth=Instance.new("Frame",bg); teeth.AnchorPoint=Vector2.new(0.5,0); teeth.Position=UDim2.new(0.5,0,0.66,0)
+        teeth.Size=UDim2.new(0.2,0,0.06,0); teeth.BackgroundColor3=Color3.fromRGB(255,255,255); teeth.BorderSizePixel=0; teeth.ZIndex=4
+        Instance.new("UICorner",teeth).CornerRadius=UDim.new(0.3,0)
+        -- Holes (sponge texture)
+        for i=1,5 do
+            local hole=Instance.new("Frame",bg); hole.AnchorPoint=Vector2.new(0.5,0.5)
+            hole.Position=UDim2.new(math.random(15,85)/100,0,math.random(75,95)/100,0)
+            hole.Size=UDim2.new(0,math.random(3,5),0,math.random(3,5))
+            hole.BackgroundColor3=Color3.fromRGB(200,180,30); hole.BorderSizePixel=0
+            Instance.new("UICorner",hole).CornerRadius=UDim.new(1,0) end
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() bg.Rotation=math.sin(t2*3)*2 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "12" then -- Upin & Ipin
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(180,140,90))
+        makeStroke(bg,Color3.fromRGB(120,80,40),2.5)
+        -- Upin head (bald with one hair)
+        local hair=Instance.new("Frame",bg); hair.AnchorPoint=Vector2.new(0.5,1); hair.Position=UDim2.new(0.5,0,0.15,0)
+        hair.Size=UDim2.new(0.05,0,0.15,0); hair.BackgroundColor3=Color3.fromRGB(30,30,30); hair.BorderSizePixel=0; hair.ZIndex=4
+        Instance.new("UICorner",hair).CornerRadius=UDim.new(0.5,0)
+        -- Eyes
+        for _,xp in ipairs({0.35,0.65}) do
+            local eyeW=Instance.new("Frame",bg); eyeW.AnchorPoint=Vector2.new(0.5,0.5); eyeW.Position=UDim2.new(xp,0,0.45,0)
+            eyeW.Size=UDim2.new(0.22,0,0.2,0); eyeW.BackgroundColor3=Color3.fromRGB(255,255,255); eyeW.BorderSizePixel=0; eyeW.ZIndex=3
+            Instance.new("UICorner",eyeW).CornerRadius=UDim.new(1,0)
+            local dot=Instance.new("Frame",eyeW); dot.AnchorPoint=Vector2.new(0.5,0.5); dot.Position=UDim2.new(0.5,0,0.5,0)
+            dot.Size=UDim2.new(0.45,0,0.45,0); dot.BackgroundColor3=Color3.fromRGB(10,10,10); dot.BorderSizePixel=0; dot.ZIndex=4
+            Instance.new("UICorner",dot).CornerRadius=UDim.new(1,0) end
+        -- Smile
+        local smile=Instance.new("Frame",bg); smile.AnchorPoint=Vector2.new(0.5,0.5); smile.Position=UDim2.new(0.5,0,0.7,0)
+        smile.Size=UDim2.new(0.4,0,0.06,0); smile.BackgroundColor3=Color3.fromRGB(10,10,10); smile.BorderSizePixel=0; smile.ZIndex=3
+        Instance.new("UICorner",smile).CornerRadius=UDim.new(0.5,0)
+        -- Kopiah/songkok label
+        local kopiah=Instance.new("TextLabel",bg); kopiah.AnchorPoint=Vector2.new(0.5,0.5); kopiah.Position=UDim2.new(0.5,0,0.88,0)
+        kopiah.Size=UDim2.new(0.6,0,0.1,0); kopiah.BackgroundTransparency=1; kopiah.Text="Upin & Ipin"
+        kopiah.TextColor3=Color3.fromRGB(60,40,20); kopiah.TextScaled=true; kopiah.Font=Enum.Font.GothamBold; kopiah.ZIndex=5
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() hair.Rotation=math.sin(t2*4)*10 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "13" then -- Doraemon
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(0,120,200))
+        makeStroke(bg,Color3.fromRGB(0,80,150),2)
+        -- White face
+        local face=makeCircle(bg,0.7,Color3.fromRGB(255,255,255)); face.ZIndex=2
+        -- Eyes
+        for _,xp in ipairs({0.4,0.6}) do
+            local eye=Instance.new("Frame",face); eye.AnchorPoint=Vector2.new(0.5,0.5); eye.Position=UDim2.new(xp,0,0.35,0)
+            eye.Size=UDim2.new(0.22,0,0.28,0); eye.BackgroundColor3=Color3.fromRGB(255,255,255); eye.BorderSizePixel=0; eye.ZIndex=3
+            Instance.new("UICorner",eye).CornerRadius=UDim.new(1,0); makeStroke(eye,Color3.fromRGB(0,0,0),1)
+            local dot=Instance.new("Frame",eye); dot.AnchorPoint=Vector2.new(0.5,0.5); dot.Position=UDim2.new(0.5,0,0.6,0)
+            dot.Size=UDim2.new(0.35,0,0.3,0); dot.BackgroundColor3=Color3.fromRGB(10,10,10); dot.BorderSizePixel=0; dot.ZIndex=4
+            Instance.new("UICorner",dot).CornerRadius=UDim.new(1,0) end
+        -- Red nose
+        local nose=makeCircle(face,0.15,Color3.fromRGB(255,50,50)); nose.Position=UDim2.new(0.5,0,0.55,0); nose.ZIndex=5
+        -- Bell
+        local bell=makeCircle(bg,0.12,Color3.fromRGB(255,220,50)); bell.Position=UDim2.new(0.5,0,0.9,0); bell.ZIndex=4
+        makeStroke(bell,Color3.fromRGB(200,170,0),1)
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() bell.Position=UDim2.new(0.5,math.sin(t2*5)*2,0.9,0) end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "14" then -- Pokemon Ball
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(255,255,255))
+        makeStroke(bg,Color3.fromRGB(30,30,30),2.5)
+        -- Top red half
+        local topHalf=Instance.new("Frame",bg); topHalf.AnchorPoint=Vector2.new(0.5,0); topHalf.Position=UDim2.new(0.5,0,0,0)
+        topHalf.Size=UDim2.new(1,0,0.48,0); topHalf.BackgroundColor3=Color3.fromRGB(220,30,30); topHalf.BorderSizePixel=0; topHalf.ZIndex=2
+        topHalf.ClipsDescendants=true
+        -- Center line
+        local line=Instance.new("Frame",bg); line.AnchorPoint=Vector2.new(0.5,0.5); line.Position=UDim2.new(0.5,0,0.5,0)
+        line.Size=UDim2.new(1,0,0.06,0); line.BackgroundColor3=Color3.fromRGB(30,30,30); line.BorderSizePixel=0; line.ZIndex=3
+        -- Center button
+        local btn=makeCircle(bg,0.22,Color3.fromRGB(255,255,255)); btn.ZIndex=4
+        makeStroke(btn,Color3.fromRGB(30,30,30),2.5)
+        local inner=makeCircle(btn,0.55,Color3.fromRGB(240,240,240)); inner.ZIndex=5
+        makeStroke(inner,Color3.fromRGB(30,30,30),1.5)
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() local p=0.2+math.sin(t2*2)*0.02; btn.Size=UDim2.new(p,0,p,0) end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then
+            TweenService:Create(bg,TweenInfo.new(0.1),{Rotation=15}):Play(); task.wait(0.1)
+            TweenService:Create(bg,TweenInfo.new(0.1),{Rotation=-15}):Play(); task.wait(0.1)
+            TweenService:Create(bg,TweenInfo.new(0.15,Enum.EasingStyle.Back),{Rotation=0}):Play()
+            doToggle() end end)
+
+    elseif key == "15" then -- Sailor Moon
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(255,200,230))
+        makeStroke(bg,Color3.fromRGB(255,150,200),2)
+        -- Crescent moon
+        local moon=Instance.new("TextLabel",bg); moon.AnchorPoint=Vector2.new(0.5,0.5); moon.Position=UDim2.new(0.5,0,0.4,0)
+        moon.Size=UDim2.new(0.5,0,0.5,0); moon.BackgroundTransparency=1; moon.Text="🌙"
+        moon.TextScaled=true; moon.ZIndex=4
+        -- Star sparkles
+        for i=1,5 do local s=Instance.new("TextLabel",bg); s.AnchorPoint=Vector2.new(0.5,0.5)
+            s.Position=UDim2.new(math.random(15,85)/100,0,math.random(15,85)/100,0)
+            s.Size=UDim2.new(0.12,0,0.12,0); s.BackgroundTransparency=1; s.Text="✦"
+            s.TextColor3=Color3.fromRGB(255,220,100); s.TextScaled=true; s.ZIndex=3 end
+        local txt=Instance.new("TextLabel",bg); txt.AnchorPoint=Vector2.new(0.5,0.5); txt.Position=UDim2.new(0.5,0,0.82,0)
+        txt.Size=UDim2.new(0.8,0,0.12,0); txt.BackgroundTransparency=1; txt.Text="Moon Prism"
+        txt.TextColor3=Color3.fromRGB(200,100,150); txt.TextScaled=true; txt.Font=Enum.Font.GothamBold; txt.ZIndex=5
+        makeIcon(bg,Color3.fromRGB(255,150,200),0.2,6)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "16" then -- Totoro
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(120,120,120))
+        makeStroke(bg,Color3.fromRGB(80,80,80),2)
+        -- White belly
+        local belly=Instance.new("Frame",bg); belly.AnchorPoint=Vector2.new(0.5,0.5); belly.Position=UDim2.new(0.5,0,0.6,0)
+        belly.Size=UDim2.new(0.55,0,0.4,0); belly.BackgroundColor3=Color3.fromRGB(220,220,210); belly.BorderSizePixel=0; belly.ZIndex=2
+        Instance.new("UICorner",belly).CornerRadius=UDim.new(0.5,0)
+        -- Chevron marks on belly
+        for i=1,3 do local ch=Instance.new("TextLabel",belly); ch.AnchorPoint=Vector2.new(0.5,0.5)
+            ch.Position=UDim2.new(0.3+i*0.15,0,0.5,0); ch.Size=UDim2.new(0.1,0,0.3,0); ch.BackgroundTransparency=1
+            ch.Text="∨"; ch.TextColor3=Color3.fromRGB(100,100,100); ch.TextScaled=true; ch.ZIndex=3 end
+        -- Eyes
+        for _,xp in ipairs({0.35,0.65}) do
+            local eye=makeCircle(bg,0.15,Color3.fromRGB(255,255,255)); eye.Position=UDim2.new(xp,0,0.3,0); eye.ZIndex=3
+            local dot=makeCircle(eye,0.4,Color3.fromRGB(10,10,10)); dot.ZIndex=4 end
+        -- Ears (triangles using rotated squares)
+        for _,data in ipairs({{0.25,-0.02,20},{0.75,-0.02,-20}}) do
+            local ear=Instance.new("Frame",bg); ear.AnchorPoint=Vector2.new(0.5,0.5)
+            ear.Position=UDim2.new(data[1],0,data[2],0); ear.Size=UDim2.new(0.15,0,0.2,0)
+            ear.BackgroundColor3=Color3.fromRGB(120,120,120); ear.BorderSizePixel=0; ear.Rotation=data[3]; ear.ZIndex=1
+            Instance.new("UICorner",ear).CornerRadius=UDim.new(0.2,0) end
+        -- Nose
+        local nose=makeCircle(bg,0.06,Color3.fromRGB(50,50,50)); nose.Position=UDim2.new(0.5,0,0.38,0); nose.ZIndex=5
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "17" then -- Pikachu
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(255,220,50))
+        makeStroke(bg,Color3.fromRGB(200,170,0),2)
+        -- Eyes
+        for _,xp in ipairs({0.35,0.65}) do
+            local eye=makeCircle(bg,0.15,Color3.fromRGB(10,10,10)); eye.Position=UDim2.new(xp,0,0.38,0); eye.ZIndex=3
+            local glint=makeCircle(eye,0.3,Color3.fromRGB(255,255,255)); glint.Position=UDim2.new(0.35,0,0.3,0); glint.ZIndex=4 end
+        -- Red cheeks
+        for _,xp in ipairs({0.2,0.8}) do
+            local cheek=makeCircle(bg,0.12,Color3.fromRGB(255,80,80)); cheek.Position=UDim2.new(xp,0,0.55,0); cheek.ZIndex=3 end
+        -- Nose
+        local nose=Instance.new("Frame",bg); nose.AnchorPoint=Vector2.new(0.5,0.5); nose.Position=UDim2.new(0.5,0,0.48,0)
+        nose.Size=UDim2.new(0.06,0,0.04,0); nose.BackgroundColor3=Color3.fromRGB(30,30,30); nose.BorderSizePixel=0; nose.ZIndex=4
+        Instance.new("UICorner",nose).CornerRadius=UDim.new(0.5,0)
+        -- Mouth
+        local mouth=Instance.new("TextLabel",bg); mouth.AnchorPoint=Vector2.new(0.5,0.5); mouth.Position=UDim2.new(0.5,0,0.58,0)
+        mouth.Size=UDim2.new(0.2,0,0.1,0); mouth.BackgroundTransparency=1; mouth.Text="ω"
+        mouth.TextColor3=Color3.fromRGB(30,30,30); mouth.TextScaled=true; mouth.ZIndex=4
+        -- Ears (pointed)
+        for _,data in ipairs({{0.2,0.05,30,Color3.fromRGB(30,30,30)},{0.8,0.05,-30,Color3.fromRGB(30,30,30)}}) do
+            local ear=Instance.new("Frame",bg); ear.AnchorPoint=Vector2.new(0.5,1); ear.Position=UDim2.new(data[1],0,data[2],0)
+            ear.Size=UDim2.new(0.08,0,0.2,0); ear.BackgroundColor3=data[4]; ear.BorderSizePixel=0; ear.Rotation=data[3]; ear.ZIndex=1
+            Instance.new("UICorner",ear).CornerRadius=UDim.new(0.3,0) end
+        -- Lightning bolt
+        local bolt=Instance.new("TextLabel",bg); bolt.AnchorPoint=Vector2.new(0.5,0.5); bolt.Position=UDim2.new(0.5,0,0.82,0)
+        bolt.Size=UDim2.new(0.25,0,0.15,0); bolt.BackgroundTransparency=1; bolt.Text="⚡"
+        bolt.TextScaled=true; bolt.ZIndex=5
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() bolt.TextTransparency=math.sin(t2*4)*0.3 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "18" then -- Goku SSJ
+        local aura=makeCircle(Container,1.3,Color3.fromRGB(255,220,50),0.6)
+        local bg=makeCircle(Container,0.9,Color3.fromRGB(255,200,100))
+        makeStroke(bg,Color3.fromRGB(255,180,0),2.5)
+        -- Spiky hair (golden)
+        for i=1,7 do
+            local spike=Instance.new("Frame",Container); spike.AnchorPoint=Vector2.new(0.5,1)
+            spike.Position=UDim2.new(0.3+i*0.06,0,0.25,0); spike.Size=UDim2.new(0.08,0,0.2+math.random(-5,5)/100,0)
+            spike.BackgroundColor3=Color3.fromRGB(255,220,50); spike.BorderSizePixel=0
+            spike.Rotation=math.random(-15,15); spike.ZIndex=1
+            Instance.new("UICorner",spike).CornerRadius=UDim.new(0.3,0) end
+        -- Face
+        for _,xp in ipairs({0.38,0.62}) do
+            local eye=makeCircle(bg,0.12,Color3.fromRGB(0,180,180)); eye.Position=UDim2.new(xp,0,0.42,0); eye.ZIndex=3 end
+        local mouth=Instance.new("Frame",bg); mouth.AnchorPoint=Vector2.new(0.5,0.5); mouth.Position=UDim2.new(0.5,0,0.7,0)
+        mouth.Size=UDim2.new(0.25,0,0.05,0); mouth.BackgroundColor3=Color3.fromRGB(200,100,50); mouth.BorderSizePixel=0; mouth.ZIndex=3
+        Instance.new("UICorner",mouth).CornerRadius=UDim.new(0.5,0)
+        -- Power text
+        local pwr=Instance.new("TextLabel",bg); pwr.AnchorPoint=Vector2.new(0.5,0.5); pwr.Position=UDim2.new(0.5,0,0.88,0)
+        pwr.Size=UDim2.new(0.6,0,0.1,0); pwr.BackgroundTransparency=1; pwr.Text="SSJ"
+        pwr.TextColor3=Color3.fromRGB(200,150,0); pwr.TextScaled=true; pwr.Font=Enum.Font.GothamBold; pwr.ZIndex=5
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function() local s=1.25+math.sin(t2*4)*0.1; aura.Size=UDim2.new(s,0,s,0)
+                aura.BackgroundTransparency=0.5+math.sin(t2*3)*0.15 end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "19" then -- Luffy Gear
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(200,50,50))
+        makeStroke(bg,Color3.fromRGB(150,30,30),2.5)
+        -- Straw hat
+        local hatBrim=Instance.new("Frame",bg); hatBrim.AnchorPoint=Vector2.new(0.5,0.5); hatBrim.Position=UDim2.new(0.5,0,0.2,0)
+        hatBrim.Size=UDim2.new(0.7,0,0.08,0); hatBrim.BackgroundColor3=Color3.fromRGB(230,200,100); hatBrim.BorderSizePixel=0; hatBrim.ZIndex=4
+        Instance.new("UICorner",hatBrim).CornerRadius=UDim.new(0.5,0)
+        local hatTop=Instance.new("Frame",bg); hatTop.AnchorPoint=Vector2.new(0.5,1); hatTop.Position=UDim2.new(0.5,0,0.2,0)
+        hatTop.Size=UDim2.new(0.4,0,0.15,0); hatTop.BackgroundColor3=Color3.fromRGB(230,200,100); hatTop.BorderSizePixel=0; hatTop.ZIndex=4
+        Instance.new("UICorner",hatTop).CornerRadius=UDim.new(0.3,0)
+        -- Band
+        local band=Instance.new("Frame",bg); band.AnchorPoint=Vector2.new(0.5,0.5); band.Position=UDim2.new(0.5,0,0.15,0)
+        band.Size=UDim2.new(0.35,0,0.03,0); band.BackgroundColor3=Color3.fromRGB(200,30,30); band.BorderSizePixel=0; band.ZIndex=5
+        -- Scar
+        local scar=Instance.new("Frame",bg); scar.AnchorPoint=Vector2.new(0.5,0.5); scar.Position=UDim2.new(0.38,0,0.45,0)
+        scar.Size=UDim2.new(0.12,0,0.04,0); scar.BackgroundColor3=Color3.fromRGB(180,30,30); scar.BorderSizePixel=0; scar.ZIndex=4; scar.Rotation=-10
+        -- Eyes (determined)
+        for _,xp in ipairs({0.38,0.62}) do
+            local eye=Instance.new("Frame",bg); eye.AnchorPoint=Vector2.new(0.5,0.5); eye.Position=UDim2.new(xp,0,0.48,0)
+            eye.Size=UDim2.new(0.12,0,0.06,0); eye.BackgroundColor3=Color3.fromRGB(10,10,10); eye.BorderSizePixel=0; eye.ZIndex=3
+            Instance.new("UICorner",eye).CornerRadius=UDim.new(0.5,0) end
+        -- Grin
+        local grin=Instance.new("TextLabel",bg); grin.AnchorPoint=Vector2.new(0.5,0.5); grin.Position=UDim2.new(0.5,0,0.65,0)
+        grin.Size=UDim2.new(0.4,0,0.2,0); grin.BackgroundTransparency=1; grin.Text="D"
+        grin.TextColor3=Color3.fromRGB(255,255,255); grin.TextScaled=true; grin.Font=Enum.Font.GothamBold; grin.ZIndex=4; grin.Rotation=180
+        -- GEAR text
+        local gear=Instance.new("TextLabel",bg); gear.AnchorPoint=Vector2.new(0.5,0.5); gear.Position=UDim2.new(0.5,0,0.88,0)
+        gear.Size=UDim2.new(0.6,0,0.1,0); gear.BackgroundTransparency=1; gear.Text="GEAR 5"
+        gear.TextColor3=Color3.fromRGB(255,220,100); gear.TextScaled=true; gear.Font=Enum.Font.GothamBold; gear.ZIndex=5
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "20" then -- Nezuko Fire
+        local bg=makeCircle(Container,0.95,Color3.fromRGB(255,180,200))
+        makeStroke(bg,Color3.fromRGB(200,100,130),2)
+        -- Gradient fire
+        local fireGrad=Instance.new("UIGradient",bg)
+        fireGrad.Color=ColorSequence.new({
+            ColorSequenceKeypoint.new(0,Color3.fromRGB(255,200,210)),
+            ColorSequenceKeypoint.new(0.5,Color3.fromRGB(255,120,150)),
+            ColorSequenceKeypoint.new(1,Color3.fromRGB(200,50,80))
+        })
+        fireGrad.Rotation=180
+        -- Eyes (pink)
+        for _,xp in ipairs({0.35,0.65}) do
+            local eye=makeCircle(bg,0.13,Color3.fromRGB(255,100,150)); eye.Position=UDim2.new(xp,0,0.38,0); eye.ZIndex=3
+            local dot=makeCircle(eye,0.4,Color3.fromRGB(80,20,40)); dot.ZIndex=4
+            local glint=makeCircle(eye,0.2,Color3.fromRGB(255,255,255)); glint.Position=UDim2.new(0.35,0,0.3,0); glint.ZIndex=5 end
+        -- Bamboo muzzle
+        local bamboo=Instance.new("Frame",bg); bamboo.AnchorPoint=Vector2.new(0.5,0.5); bamboo.Position=UDim2.new(0.5,0,0.6,0)
+        bamboo.Size=UDim2.new(0.45,0,0.08,0); bamboo.BackgroundColor3=Color3.fromRGB(120,180,80); bamboo.BorderSizePixel=0; bamboo.ZIndex=4
+        Instance.new("UICorner",bamboo).CornerRadius=UDim.new(0.5,0)
+        -- Horn
+        local horn=Instance.new("Frame",bg); horn.AnchorPoint=Vector2.new(0.5,1); horn.Position=UDim2.new(0.4,0,0.12,0)
+        horn.Size=UDim2.new(0.06,0,0.12,0); horn.BackgroundColor3=Color3.fromRGB(200,50,80); horn.BorderSizePixel=0; horn.ZIndex=4; horn.Rotation=10
+        Instance.new("UICorner",horn).CornerRadius=UDim.new(0.3,0)
+        -- Fire particles
+        local fires={}
+        for i=1,6 do local f=Instance.new("TextLabel",Container); f.AnchorPoint=Vector2.new(0.5,0.5)
+            f.Position=UDim2.new(math.random(10,90)/100,0,math.random(10,90)/100,0)
+            f.Size=UDim2.new(0.12,0,0.12,0); f.BackgroundTransparency=1; f.Text="🔥"; f.TextScaled=true; f.ZIndex=1
+            f.TextTransparency=math.random(30,70)/100
+            table.insert(fires,{label=f,speed=math.random(30,60)/100}) end
+        -- Text
+        local txt=Instance.new("TextLabel",bg); txt.AnchorPoint=Vector2.new(0.5,0.5); txt.Position=UDim2.new(0.5,0,0.88,0)
+        txt.Size=UDim2.new(0.6,0,0.1,0); txt.BackgroundTransparency=1; txt.Text="禰豆子"
+        txt.TextColor3=Color3.fromRGB(150,30,60); txt.TextScaled=true; txt.Font=Enum.Font.GothamBold; txt.ZIndex=5
+        local t2=0
+        local ac=RunService.Heartbeat:Connect(function(dt) if not getgenv().EnzoScriptLoaded then return end; t2=t2+dt
+            pcall(function()
+                fireGrad.Rotation=180+math.sin(t2*2)*15
+                for _,f in ipairs(fires) do
+                    local ny=f.label.Position.Y.Scale-f.speed*dt
+                    if ny<0.05 then ny=0.95 end
+                    f.label.Position=UDim2.new(f.label.Position.X.Scale,0,ny,0)
+                    f.label.TextTransparency=0.3+math.sin(t2*3)*0.3
+                end
+            end) end)
+        table.insert(getgenv().EnzoConnections,ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "21" then -- Patrick Star
+        local bg = makeCircle(Container, 0.95, Color3.fromRGB(255, 150, 170))
+        makeStroke(bg, Color3.fromRGB(200, 100, 120), 2)
+        -- Belly
+        local belly = makeCircle(bg, 0.45, Color3.fromRGB(255, 200, 180))
+        belly.Position = UDim2.new(0.5, 0, 0.6, 0); belly.ZIndex = 2
+        -- Eyes (half-closed, dumb look)
+        for _, xp in ipairs({0.38, 0.62}) do
+            local eyeW = Instance.new("Frame", bg); eyeW.AnchorPoint = Vector2.new(0.5, 0.5)
+            eyeW.Position = UDim2.new(xp, 0, 0.35, 0); eyeW.Size = UDim2.new(0.18, 0, 0.12, 0)
+            eyeW.BackgroundColor3 = Color3.fromRGB(255, 255, 255); eyeW.BorderSizePixel = 0; eyeW.ZIndex = 3
+            Instance.new("UICorner", eyeW).CornerRadius = UDim.new(1, 0)
+            local dot = makeCircle(eyeW, 0.4, Color3.fromRGB(10, 10, 10)); dot.ZIndex = 4
+        end
+        -- Eyebrows (thick, raised)
+        for _, data in ipairs({{0.35, 0.26, 10}, {0.65, 0.26, -10}}) do
+            local brow = Instance.new("Frame", bg); brow.AnchorPoint = Vector2.new(0.5, 0.5)
+            brow.Position = UDim2.new(data[1], 0, data[2], 0); brow.Size = UDim2.new(0.15, 0, 0.03, 0)
+            brow.BackgroundColor3 = Color3.fromRGB(200, 80, 100); brow.BorderSizePixel = 0
+            brow.Rotation = data[3]; brow.ZIndex = 4
+        end
+        -- Mouth (big dumb smile)
+        local mouth = Instance.new("Frame", bg); mouth.AnchorPoint = Vector2.new(0.5, 0.5)
+        mouth.Position = UDim2.new(0.5, 0, 0.52, 0); mouth.Size = UDim2.new(0.35, 0, 0.06, 0)
+        mouth.BackgroundColor3 = Color3.fromRGB(10, 10, 10); mouth.BorderSizePixel = 0; mouth.ZIndex = 3
+        Instance.new("UICorner", mouth).CornerRadius = UDim.new(0.5, 0)
+        -- Pants (green)
+        local pants = Instance.new("Frame", bg); pants.AnchorPoint = Vector2.new(0.5, 0.5)
+        pants.Position = UDim2.new(0.5, 0, 0.82, 0); pants.Size = UDim2.new(0.5, 0, 0.12, 0)
+        pants.BackgroundColor3 = Color3.fromRGB(100, 200, 100); pants.BorderSizePixel = 0; pants.ZIndex = 3
+        Instance.new("UICorner", pants).CornerRadius = UDim.new(0.2, 0)
+        -- Flower pattern on pants
+        local flower = Instance.new("TextLabel", pants); flower.AnchorPoint = Vector2.new(0.5, 0.5)
+        flower.Position = UDim2.new(0.5, 0, 0.5, 0); flower.Size = UDim2.new(0.4, 0, 0.8, 0)
+        flower.BackgroundTransparency = 1; flower.Text = "🌺"; flower.TextScaled = true; flower.ZIndex = 4
+        local t2 = 0
+        local ac = RunService.Heartbeat:Connect(function(dt)
+            if not getgenv().EnzoScriptLoaded then return end; t2 = t2 + dt
+            pcall(function() bg.Rotation = math.sin(t2 * 2) * 3 end)
+        end)
+        table.insert(getgenv().EnzoConnections, ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "22" then -- Finn (Adventure Time)
+        -- White hat/head shape
+        local bg = Instance.new("Frame", Container); bg.AnchorPoint = Vector2.new(0.5, 0.5)
+        bg.Position = UDim2.new(0.5, 0, 0.5, 0); bg.Size = UDim2.new(0.9, 0, 0.95, 0)
+        bg.BackgroundColor3 = Color3.fromRGB(255, 255, 255); bg.BorderSizePixel = 0
+        Instance.new("UICorner", bg).CornerRadius = UDim.new(0.35, 0)
+        makeStroke(bg, Color3.fromRGB(200, 200, 200), 2)
+        -- Face opening (skin colored oval)
+        local face = Instance.new("Frame", bg); face.AnchorPoint = Vector2.new(0.5, 0.5)
+        face.Position = UDim2.new(0.5, 0, 0.55, 0); face.Size = UDim2.new(0.6, 0, 0.45, 0)
+        face.BackgroundColor3 = Color3.fromRGB(255, 210, 170); face.BorderSizePixel = 0; face.ZIndex = 2
+        Instance.new("UICorner", face).CornerRadius = UDim.new(0.5, 0)
+        -- Eyes (tiny black dots)
+        for _, xp in ipairs({0.38, 0.62}) do
+            local eye = makeCircle(face, 0.12, Color3.fromRGB(10, 10, 10))
+            eye.Position = UDim2.new(xp, 0, 0.4, 0); eye.ZIndex = 3
+        end
+        -- Mouth (open smile)
+        local mouth = Instance.new("Frame", face); mouth.AnchorPoint = Vector2.new(0.5, 0.5)
+        mouth.Position = UDim2.new(0.5, 0, 0.72, 0); mouth.Size = UDim2.new(0.35, 0, 0.15, 0)
+        mouth.BackgroundColor3 = Color3.fromRGB(10, 10, 10); mouth.BorderSizePixel = 0; mouth.ZIndex = 3
+        Instance.new("UICorner", mouth).CornerRadius = UDim.new(0.5, 0)
+        -- Bear ears on hat
+        for _, xp in ipairs({0.2, 0.8}) do
+            local ear = makeCircle(bg, 0.15, Color3.fromRGB(255, 255, 255))
+            ear.Position = UDim2.new(xp, 0, 0.1, 0); ear.ZIndex = 1
+        end
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "23" then -- Gumball
+        local bg = makeCircle(Container, 0.95, Color3.fromRGB(50, 130, 220))
+        makeStroke(bg, Color3.fromRGB(30, 90, 170), 2)
+        -- Big white eyes
+        for _, data in ipairs({{0.32, 0.38, 0.3}, {0.68, 0.38, 0.3}}) do
+            local eyeW = makeCircle(bg, data[3], Color3.fromRGB(255, 255, 255))
+            eyeW.Position = UDim2.new(data[1], 0, data[2], 0); eyeW.ZIndex = 3
+            makeStroke(eyeW, Color3.fromRGB(10, 10, 10), 1)
+            local pupil = makeCircle(eyeW, 0.45, Color3.fromRGB(10, 10, 10)); pupil.ZIndex = 4
+            local glint = makeCircle(eyeW, 0.15, Color3.fromRGB(255, 255, 255))
+            glint.Position = UDim2.new(0.35, 0, 0.3, 0); glint.ZIndex = 5
+        end
+        -- Whiskers
+        for _, data in ipairs({{0.15, 0.55, -5}, {0.15, 0.62, 5}, {0.85, 0.55, 5}, {0.85, 0.62, -5}}) do
+            local wh = Instance.new("Frame", bg); wh.AnchorPoint = Vector2.new(0.5, 0.5)
+            wh.Position = UDim2.new(data[1], 0, data[2], 0); wh.Size = UDim2.new(0.15, 0, 0, 1)
+            wh.BackgroundColor3 = Color3.fromRGB(30, 90, 170); wh.BorderSizePixel = 0
+            wh.Rotation = data[3]; wh.ZIndex = 2
+        end
+        -- Cat ears
+        for _, data in ipairs({{0.25, 0.05, 15}, {0.75, 0.05, -15}}) do
+            local ear = Instance.new("Frame", bg); ear.AnchorPoint = Vector2.new(0.5, 1)
+            ear.Position = UDim2.new(data[1], 0, data[2], 0); ear.Size = UDim2.new(0.12, 0, 0.18, 0)
+            ear.BackgroundColor3 = Color3.fromRGB(50, 130, 220); ear.BorderSizePixel = 0
+            ear.Rotation = data[3]; ear.ZIndex = 1
+            Instance.new("UICorner", ear).CornerRadius = UDim.new(0.2, 0)
+        end
+        -- Mouth
+        local mouth = Instance.new("TextLabel", bg); mouth.AnchorPoint = Vector2.new(0.5, 0.5)
+        mouth.Position = UDim2.new(0.5, 0, 0.68, 0); mouth.Size = UDim2.new(0.3, 0, 0.15, 0)
+        mouth.BackgroundTransparency = 1; mouth.Text = "3"; mouth.TextColor3 = Color3.fromRGB(30, 90, 170)
+        mouth.TextScaled = true; mouth.Font = Enum.Font.GothamBold; mouth.ZIndex = 3; mouth.Rotation = 90
+        local t2 = 0
+        local ac = RunService.Heartbeat:Connect(function(dt)
+            if not getgenv().EnzoScriptLoaded then return end; t2 = t2 + dt
+            pcall(function() bg.Rotation = math.sin(t2 * 4) * 2 end)
+        end)
+        table.insert(getgenv().EnzoConnections, ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "24" then -- Ben 10 Omnitrix
+        local bg = makeCircle(Container, 0.95, Color3.fromRGB(20, 20, 20))
+        local bgStroke = makeStroke(bg, Color3.fromRGB(0, 200, 0), 2.5)
+        -- Green hourglass symbol
+        local hourglassTop = Instance.new("Frame", bg); hourglassTop.AnchorPoint = Vector2.new(0.5, 1)
+        hourglassTop.Position = UDim2.new(0.5, 0, 0.5, 0); hourglassTop.Size = UDim2.new(0.35, 0, 0.3, 0)
+        hourglassTop.BackgroundColor3 = Color3.fromRGB(0, 200, 0); hourglassTop.BorderSizePixel = 0; hourglassTop.ZIndex = 3
+        Instance.new("UICorner", hourglassTop).CornerRadius = UDim.new(0.1, 0)
+        local hourglassBot = Instance.new("Frame", bg); hourglassBot.AnchorPoint = Vector2.new(0.5, 0)
+        hourglassBot.Position = UDim2.new(0.5, 0, 0.5, 0); hourglassBot.Size = UDim2.new(0.35, 0, 0.3, 0)
+        hourglassBot.BackgroundColor3 = Color3.fromRGB(0, 200, 0); hourglassBot.BorderSizePixel = 0; hourglassBot.ZIndex = 3
+        Instance.new("UICorner", hourglassBot).CornerRadius = UDim.new(0.1, 0)
+        -- Center pinch
+        local pinch = Instance.new("Frame", bg); pinch.AnchorPoint = Vector2.new(0.5, 0.5)
+        pinch.Position = UDim2.new(0.5, 0, 0.5, 0); pinch.Size = UDim2.new(0.12, 0, 0.08, 0)
+        pinch.BackgroundColor3 = Color3.fromRGB(0, 200, 0); pinch.BorderSizePixel = 0; pinch.ZIndex = 4
+        -- Outer ring details
+        for i = 1, 4 do
+            local seg = Instance.new("Frame", bg); seg.AnchorPoint = Vector2.new(0.5, 0.5)
+            seg.Position = UDim2.new(0.5, 0, 0.5, 0); seg.Size = UDim2.new(0.9, 0, 0.04, 0)
+            seg.BackgroundColor3 = Color3.fromRGB(0, 150, 0); seg.BackgroundTransparency = 0.5
+            seg.BorderSizePixel = 0; seg.Rotation = 45 * i; seg.ZIndex = 2
+        end
+        -- Dial rim
+        local rim = makeCircle(bg, 0.88, nil, 1); rim.ZIndex = 2
+        makeStroke(rim, Color3.fromRGB(50, 50, 50), 3)
+        makeIcon(bg, Color3.fromRGB(0, 200, 0), 0.2, 5)
+        local t2 = 0
+        local ac = RunService.Heartbeat:Connect(function(dt)
+            if not getgenv().EnzoScriptLoaded then return end; t2 = t2 + dt
+            pcall(function()
+                local pulse = 0.93 + math.sin(t2 * 2) * 0.03
+                bg.Size = UDim2.new(pulse, 0, pulse, 0)
+                local g = 180 + math.sin(t2 * 3) * 40
+                bgStroke.Color = Color3.fromRGB(0, g, 0)
+            end)
+        end)
+        table.insert(getgenv().EnzoConnections, ac)
+        ToggleBtn.MouseButton1Click:Connect(function()
+            if hasDragged then return end
+            -- Omnitrix activation
+            TweenService:Create(bg, TweenInfo.new(0.1), {Size = UDim2.new(1.05, 0, 1.05, 0)}):Play()
+            TweenService:Create(bgStroke, TweenInfo.new(0.1), {Color = Color3.fromRGB(0, 255, 0), Thickness = 4}):Play()
+            task.wait(0.15)
+            TweenService:Create(bg, TweenInfo.new(0.2, Enum.EasingStyle.Back), {Size = UDim2.new(0.95, 0, 0.95, 0)}):Play()
+            TweenService:Create(bgStroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(0, 200, 0), Thickness = 2.5}):Play()
+            doToggle()
+        end)
+
+    elseif key == "25" then -- Avatar Aang
+        local bg = makeCircle(Container, 0.95, Color3.fromRGB(255, 210, 170))
+        makeStroke(bg, Color3.fromRGB(200, 160, 120), 2)
+        -- Arrow tattoo
+        local arrowV = Instance.new("Frame", bg); arrowV.AnchorPoint = Vector2.new(0.5, 0)
+        arrowV.Position = UDim2.new(0.5, 0, 0, 0); arrowV.Size = UDim2.new(0.1, 0, 0.45, 0)
+        arrowV.BackgroundColor3 = Color3.fromRGB(100, 180, 230); arrowV.BorderSizePixel = 0; arrowV.ZIndex = 3
+        local arrowTip = Instance.new("Frame", bg); arrowTip.AnchorPoint = Vector2.new(0.5, 0.5)
+        arrowTip.Position = UDim2.new(0.5, 0, 0.35, 0); arrowTip.Size = UDim2.new(0.35, 0, 0.06, 0)
+        arrowTip.BackgroundColor3 = Color3.fromRGB(100, 180, 230); arrowTip.BorderSizePixel = 0; arrowTip.ZIndex = 3
+        Instance.new("UICorner", arrowTip).CornerRadius = UDim.new(0.5, 0)
+        -- Eyes (can glow)
+        local eyes = {}
+        for _, xp in ipairs({0.35, 0.65}) do
+            local eye = makeCircle(bg, 0.12, Color3.fromRGB(100, 100, 100))
+            eye.Position = UDim2.new(xp, 0, 0.5, 0); eye.ZIndex = 4
+            table.insert(eyes, eye)
+        end
+        -- Mouth
+        local mouth = Instance.new("Frame", bg); mouth.AnchorPoint = Vector2.new(0.5, 0.5)
+        mouth.Position = UDim2.new(0.5, 0, 0.7, 0); mouth.Size = UDim2.new(0.2, 0, 0.04, 0)
+        mouth.BackgroundColor3 = Color3.fromRGB(150, 100, 80); mouth.BorderSizePixel = 0; mouth.ZIndex = 3
+        Instance.new("UICorner", mouth).CornerRadius = UDim.new(0.5, 0)
+        -- Element symbols around
+        local elements = {"🔥", "💧", "🌍", "💨"}
+        local elemFrames = {}
+        for i, elem in ipairs(elements) do
+            local e = Instance.new("TextLabel", Container); e.AnchorPoint = Vector2.new(0.5, 0.5)
+            e.Size = UDim2.new(0.15, 0, 0.15, 0); e.BackgroundTransparency = 1
+            e.Text = elem; e.TextScaled = true; e.ZIndex = 2
+            table.insert(elemFrames, {label = e, angle = 90 * (i - 1)})
+        end
+        local t2 = 0
+        local avatarState = false
+        local ac = RunService.Heartbeat:Connect(function(dt)
+            if not getgenv().EnzoScriptLoaded then return end; t2 = t2 + dt
+            pcall(function()
+                -- Elements orbit
+                for _, ef in ipairs(elemFrames) do
+                    ef.angle = ef.angle + 40 * dt
+                    local rad = math.rad(ef.angle)
+                    ef.label.Position = UDim2.new(0.5 + math.cos(rad) * 0.48, 0, 0.5 + math.sin(rad) * 0.48, 0)
+                end
+                -- Eye glow pulse
+                local glow = avatarState and Color3.fromRGB(200, 230, 255) or Color3.fromRGB(100, 100, 100)
+                for _, eye in ipairs(eyes) do eye.BackgroundColor3 = glow end
+                -- Toggle avatar state periodically
+                if math.floor(t2 / 3) % 2 == 0 then avatarState = true else avatarState = false end
+            end)
+        end)
+        table.insert(getgenv().EnzoConnections, ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "26" then -- Powerpuff Girls
+        local bg = makeCircle(Container, 0.95, Color3.fromRGB(255, 180, 200))
+        makeStroke(bg, Color3.fromRGB(255, 100, 150), 2)
+        -- 3 circles representing Blossom, Bubbles, Buttercup
+        local ppg = {
+            {0.25, 0.45, Color3.fromRGB(255, 100, 130)}, -- Blossom (pink)
+            {0.5, 0.35, Color3.fromRGB(100, 180, 255)},  -- Bubbles (blue)
+            {0.75, 0.45, Color3.fromRGB(100, 220, 100)},  -- Buttercup (green)
+        }
+        local ppgFrames = {}
+        for _, data in ipairs(ppg) do
+            local girl = makeCircle(bg, 0.25, data[3])
+            girl.Position = UDim2.new(data[1], 0, data[2], 0); girl.ZIndex = 3
+            makeStroke(girl, Color3.fromRGB(0, 0, 0), 1)
+            -- Big eyes
+            for _, ex in ipairs({0.35, 0.65}) do
+                local eye = makeCircle(girl, 0.3, Color3.fromRGB(255, 255, 255))
+                eye.Position = UDim2.new(ex, 0, 0.4, 0); eye.ZIndex = 4
+                local dot = makeCircle(eye, 0.5, Color3.fromRGB(10, 10, 10)); dot.ZIndex = 5
+            end
+            table.insert(ppgFrames, girl)
+        end
+        -- Text
+        local txt = Instance.new("TextLabel", bg); txt.AnchorPoint = Vector2.new(0.5, 0.5)
+        txt.Position = UDim2.new(0.5, 0, 0.78, 0); txt.Size = UDim2.new(0.8, 0, 0.12, 0)
+        txt.BackgroundTransparency = 1; txt.Text = "PPG"; txt.TextColor3 = Color3.fromRGB(200, 50, 100)
+        txt.TextScaled = true; txt.Font = Enum.Font.GothamBold; txt.ZIndex = 5
+        -- Star burst
+        local star = Instance.new("TextLabel", bg); star.AnchorPoint = Vector2.new(0.5, 0.5)
+        star.Position = UDim2.new(0.5, 0, 0.9, 0); star.Size = UDim2.new(0.15, 0, 0.1, 0)
+        star.BackgroundTransparency = 1; star.Text = "⭐"; star.TextScaled = true; star.ZIndex = 4
+        local t2 = 0
+        local ac = RunService.Heartbeat:Connect(function(dt)
+            if not getgenv().EnzoScriptLoaded then return end; t2 = t2 + dt
+            pcall(function()
+                for j, g in ipairs(ppgFrames) do
+                    local bounce = math.sin(t2 * 3 + j * 1.5) * 0.02
+                    g.Size = UDim2.new(0.25 + bounce, 0, 0.25 + bounce, 0)
+                end
+            end)
+        end)
+        table.insert(getgenv().EnzoConnections, ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "27" then -- Dexter's Laboratory
+        local bg = Instance.new("Frame", Container); bg.AnchorPoint = Vector2.new(0.5, 0.5)
+        bg.Position = UDim2.new(0.5, 0, 0.5, 0); bg.Size = UDim2.new(0.95, 0, 0.95, 0)
+        bg.BackgroundColor3 = Color3.fromRGB(180, 180, 200); bg.BorderSizePixel = 0
+        Instance.new("UICorner", bg).CornerRadius = UDim.new(0.15, 0)
+        makeStroke(bg, Color3.fromRGB(100, 50, 150), 2)
+        -- Purple gloves/lab coat feel
+        local labcoat = Instance.new("Frame", bg); labcoat.AnchorPoint = Vector2.new(0.5, 0.5)
+        labcoat.Position = UDim2.new(0.5, 0, 0.7, 0); labcoat.Size = UDim2.new(0.7, 0, 0.35, 0)
+        labcoat.BackgroundColor3 = Color3.fromRGB(255, 255, 255); labcoat.BorderSizePixel = 0; labcoat.ZIndex = 2
+        Instance.new("UICorner", labcoat).CornerRadius = UDim.new(0.2, 0)
+        -- Big glasses
+        for _, xp in ipairs({0.35, 0.65}) do
+            local lens = makeCircle(bg, 0.22, Color3.fromRGB(200, 220, 255))
+            lens.Position = UDim2.new(xp, 0, 0.35, 0); lens.ZIndex = 3
+            makeStroke(lens, Color3.fromRGB(10, 10, 10), 2)
+            local dot = makeCircle(lens, 0.3, Color3.fromRGB(10, 10, 10)); dot.ZIndex = 4
+        end
+        -- Glass bridge
+        local bridge = Instance.new("Frame", bg); bridge.AnchorPoint = Vector2.new(0.5, 0.5)
+        bridge.Position = UDim2.new(0.5, 0, 0.33, 0); bridge.Size = UDim2.new(0.1, 0, 0.03, 0)
+        bridge.BackgroundColor3 = Color3.fromRGB(10, 10, 10); bridge.BorderSizePixel = 0; bridge.ZIndex = 4
+        -- Red hair
+        local hair = Instance.new("Frame", bg); hair.AnchorPoint = Vector2.new(0.5, 1)
+        hair.Position = UDim2.new(0.5, 0, 0.18, 0); hair.Size = UDim2.new(0.55, 0, 0.2, 0)
+        hair.BackgroundColor3 = Color3.fromRGB(220, 80, 30); hair.BorderSizePixel = 0; hair.ZIndex = 1
+        Instance.new("UICorner", hair).CornerRadius = UDim.new(0.3, 0)
+        -- "GENIUS" text
+        local txt = Instance.new("TextLabel", bg); txt.AnchorPoint = Vector2.new(0.5, 0.5)
+        txt.Position = UDim2.new(0.5, 0, 0.9, 0); txt.Size = UDim2.new(0.7, 0, 0.08, 0)
+        txt.BackgroundTransparency = 1; txt.Text = "GENIUS"
+        txt.TextColor3 = Color3.fromRGB(100, 50, 150); txt.TextScaled = true
+        txt.Font = Enum.Font.GothamBold; txt.ZIndex = 5
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "28" then -- Tom & Jerry
+        local bg = makeCircle(Container, 0.95, Color3.fromRGB(255, 230, 180))
+        makeStroke(bg, Color3.fromRGB(200, 170, 120), 2)
+        -- Tom (left, blue-gray cat)
+        local tom = makeCircle(bg, 0.35, Color3.fromRGB(120, 140, 170))
+        tom.Position = UDim2.new(0.28, 0, 0.4, 0); tom.ZIndex = 3
+        -- Tom eyes
+        local tomEye = makeCircle(tom, 0.3, Color3.fromRGB(255, 255, 0))
+        tomEye.Position = UDim2.new(0.65, 0, 0.4, 0); tomEye.ZIndex = 4
+        local tomPupil = makeCircle(tomEye, 0.4, Color3.fromRGB(10, 10, 10)); tomPupil.ZIndex = 5
+        -- Tom ear
+        local tomEar = Instance.new("Frame", tom); tomEar.AnchorPoint = Vector2.new(0.5, 1)
+        tomEar.Position = UDim2.new(0.3, 0, 0.05, 0); tomEar.Size = UDim2.new(0.2, 0, 0.25, 0)
+        tomEar.BackgroundColor3 = Color3.fromRGB(120, 140, 170); tomEar.BorderSizePixel = 0
+        tomEar.Rotation = -15; tomEar.ZIndex = 2
+        Instance.new("UICorner", tomEar).CornerRadius = UDim.new(0.2, 0)
+        -- Jerry (right, brown mouse)
+        local jerry = makeCircle(bg, 0.25, Color3.fromRGB(180, 130, 80))
+        jerry.Position = UDim2.new(0.72, 0, 0.5, 0); jerry.ZIndex = 3
+        -- Jerry eyes
+        local jerryEye = makeCircle(jerry, 0.35, Color3.fromRGB(255, 255, 255))
+        jerryEye.Position = UDim2.new(0.35, 0, 0.35, 0); jerryEye.ZIndex = 4
+        local jerryPupil = makeCircle(jerryEye, 0.4, Color3.fromRGB(10, 10, 10)); jerryPupil.ZIndex = 5
+        -- Jerry ear
+        local jerryEar = makeCircle(jerry, 0.25, Color3.fromRGB(255, 180, 150))
+        jerryEar.Position = UDim2.new(0.7, 0, 0.1, 0); jerryEar.ZIndex = 2
+        -- VS text
+        local vs = Instance.new("TextLabel", bg); vs.AnchorPoint = Vector2.new(0.5, 0.5)
+        vs.Position = UDim2.new(0.5, 0, 0.5, 0); vs.Size = UDim2.new(0.2, 0, 0.15, 0)
+        vs.BackgroundTransparency = 1; vs.Text = "VS"
+        vs.TextColor3 = Color3.fromRGB(255, 50, 50); vs.TextScaled = true
+        vs.Font = Enum.Font.GothamBold; vs.ZIndex = 5
+        -- Chase animation
+        local t2 = 0
+        local ac = RunService.Heartbeat:Connect(function(dt)
+            if not getgenv().EnzoScriptLoaded then return end; t2 = t2 + dt
+            pcall(function()
+                local chase = math.sin(t2 * 3) * 0.03
+                tom.Position = UDim2.new(0.28 + chase, 0, 0.4, 0)
+                jerry.Position = UDim2.new(0.72 + chase, 0, 0.5, 0)
+            end)
+        end)
+        table.insert(getgenv().EnzoConnections, ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "29" then -- Naruto Chibi
+        local bg = makeCircle(Container, 0.95, Color3.fromRGB(255, 180, 100))
+        makeStroke(bg, Color3.fromRGB(200, 130, 50), 2)
+        -- Headband
+        local headband = Instance.new("Frame", bg); headband.AnchorPoint = Vector2.new(0.5, 0.5)
+        headband.Position = UDim2.new(0.5, 0, 0.22, 0); headband.Size = UDim2.new(0.8, 0, 0.1, 0)
+        headband.BackgroundColor3 = Color3.fromRGB(50, 80, 130); headband.BorderSizePixel = 0; headband.ZIndex = 3
+        Instance.new("UICorner", headband).CornerRadius = UDim.new(0.3, 0)
+        -- Metal plate
+        local plate = Instance.new("Frame", headband); plate.AnchorPoint = Vector2.new(0.5, 0.5)
+        plate.Position = UDim2.new(0.5, 0, 0.5, 0); plate.Size = UDim2.new(0.35, 0, 0.8, 0)
+        plate.BackgroundColor3 = Color3.fromRGB(180, 180, 190); plate.BorderSizePixel = 0; plate.ZIndex = 4
+        Instance.new("UICorner", plate).CornerRadius = UDim.new(0.2, 0)
+        -- Leaf symbol
+        local leaf = Instance.new("TextLabel", plate); leaf.AnchorPoint = Vector2.new(0.5, 0.5)
+        leaf.Position = UDim2.new(0.5, 0, 0.5, 0); leaf.Size = UDim2.new(0.7, 0, 0.7, 0)
+        leaf.BackgroundTransparency = 1; leaf.Text = "🍃"
+        leaf.TextScaled = true; leaf.ZIndex = 5
+        -- Chibi eyes (big, blue)
+        for _, xp in ipairs({0.35, 0.65}) do
+            local eye = makeCircle(bg, 0.16, Color3.fromRGB(50, 130, 220))
+            eye.Position = UDim2.new(xp, 0, 0.45, 0); eye.ZIndex = 3
+            local glint = makeCircle(eye, 0.25, Color3.fromRGB(255, 255, 255))
+            glint.Position = UDim2.new(0.35, 0, 0.3, 0); glint.ZIndex = 4
+        end
+        -- Whisker marks
+        for _, data in ipairs({{0.15, 0.52}, {0.15, 0.58}, {0.15, 0.64}, {0.85, 0.52}, {0.85, 0.58}, {0.85, 0.64}}) do
+            local wh = Instance.new("Frame", bg); wh.AnchorPoint = Vector2.new(0.5, 0.5)
+            wh.Position = UDim2.new(data[1], 0, data[2], 0); wh.Size = UDim2.new(0.12, 0, 0, 1)
+            wh.BackgroundColor3 = Color3.fromRGB(180, 120, 60); wh.BorderSizePixel = 0; wh.ZIndex = 3
+        end
+        -- Big smile
+        local smile = Instance.new("TextLabel", bg); smile.AnchorPoint = Vector2.new(0.5, 0.5)
+        smile.Position = UDim2.new(0.5, 0, 0.72, 0); smile.Size = UDim2.new(0.3, 0, 0.15, 0)
+        smile.BackgroundTransparency = 1; smile.Text = "ω"
+        smile.TextColor3 = Color3.fromRGB(200, 100, 50); smile.TextScaled = true
+        smile.Font = Enum.Font.GothamBold; smile.ZIndex = 3
+        -- "Dattebayo" text
+        local datte = Instance.new("TextLabel", bg); datte.AnchorPoint = Vector2.new(0.5, 0.5)
+        datte.Position = UDim2.new(0.5, 0, 0.9, 0); datte.Size = UDim2.new(0.8, 0, 0.08, 0)
+        datte.BackgroundTransparency = 1; datte.Text = "だってばよ!"
+        datte.TextColor3 = Color3.fromRGB(200, 100, 30); datte.TextScaled = true
+        datte.Font = Enum.Font.GothamBold; datte.ZIndex = 5
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+
+    elseif key == "30" then -- Shinchan
+        local bg = makeCircle(Container, 0.95, Color3.fromRGB(255, 220, 180))
+        makeStroke(bg, Color3.fromRGB(200, 170, 130), 2)
+        -- THICK eyebrows (Shinchan's signature)
+        for _, data in ipairs({{0.32, 0.28, 0.25, 0.08}, {0.68, 0.28, 0.25, 0.08}}) do
+            local brow = Instance.new("Frame", bg); brow.AnchorPoint = Vector2.new(0.5, 0.5)
+            brow.Position = UDim2.new(data[1], 0, data[2], 0)
+            brow.Size = UDim2.new(data[3], 0, data[4], 0)
+            brow.BackgroundColor3 = Color3.fromRGB(10, 10, 10); brow.BorderSizePixel = 0; brow.ZIndex = 4
+            Instance.new("UICorner", brow).CornerRadius = UDim.new(0.3, 0)
+        end
+        -- Eyes (small dots under thick brows)
+        for _, xp in ipairs({0.35, 0.65}) do
+            local eye = makeCircle(bg, 0.08, Color3.fromRGB(10, 10, 10))
+            eye.Position = UDim2.new(xp, 0, 0.42, 0); eye.ZIndex = 3
+        end
+        -- Nose
+        local nose = makeCircle(bg, 0.05, Color3.fromRGB(230, 180, 150))
+        nose.Position = UDim2.new(0.5, 0, 0.5, 0); nose.ZIndex = 3
+        -- Mouth (cheeky grin)
+        local mouth = Instance.new("Frame", bg); mouth.AnchorPoint = Vector2.new(0.5, 0.5)
+        mouth.Position = UDim2.new(0.5, 0, 0.62, 0); mouth.Size = UDim2.new(0.3, 0, 0.06, 0)
+        mouth.BackgroundColor3 = Color3.fromRGB(200, 80, 80); mouth.BorderSizePixel = 0; mouth.ZIndex = 3
+        Instance.new("UICorner", mouth).CornerRadius = UDim.new(0.5, 0)
+        -- Blush cheeks
+        for _, xp in ipairs({0.2, 0.8}) do
+            local blush = makeCircle(bg, 0.1, Color3.fromRGB(255, 150, 150), 0.3)
+            blush.Position = UDim2.new(xp, 0, 0.55, 0); blush.ZIndex = 2
+        end
+        -- Hair (messy black)
+        for i = 1, 5 do
+            local strand = Instance.new("Frame", bg); strand.AnchorPoint = Vector2.new(0.5, 1)
+            strand.Position = UDim2.new(0.25 + i * 0.1, 0, 0.15, 0)
+            strand.Size = UDim2.new(0.08, 0, 0.12 + math.random(-3, 3) / 100, 0)
+            strand.BackgroundColor3 = Color3.fromRGB(10, 10, 10); strand.BorderSizePixel = 0
+            strand.Rotation = math.random(-10, 10); strand.ZIndex = 1
+            Instance.new("UICorner", strand).CornerRadius = UDim.new(0.3, 0)
+        end
+        -- Red shirt peek
+        local shirt = Instance.new("Frame", bg); shirt.AnchorPoint = Vector2.new(0.5, 0)
+        shirt.Position = UDim2.new(0.5, 0, 0.85, 0); shirt.Size = UDim2.new(0.5, 0, 0.12, 0)
+        shirt.BackgroundColor3 = Color3.fromRGB(220, 50, 50); shirt.BorderSizePixel = 0; shirt.ZIndex = 2
+        Instance.new("UICorner", shirt).CornerRadius = UDim.new(0.2, 0)
+        -- Yellow zigzag on shirt
+        local zig = Instance.new("TextLabel", shirt); zig.AnchorPoint = Vector2.new(0.5, 0.5)
+        zig.Position = UDim2.new(0.5, 0, 0.5, 0); zig.Size = UDim2.new(0.6, 0, 0.6, 0)
+        zig.BackgroundTransparency = 1; zig.Text = "∿"
+        zig.TextColor3 = Color3.fromRGB(255, 220, 50); zig.TextScaled = true; zig.ZIndex = 3
+        -- Butt dance animation
+        local t2 = 0
+        local ac = RunService.Heartbeat:Connect(function(dt)
+            if not getgenv().EnzoScriptLoaded then return end; t2 = t2 + dt
+            pcall(function()
+                bg.Rotation = math.sin(t2 * 5) * 4
+                bg.Position = UDim2.new(0.5, 0, 0.5 + math.abs(math.sin(t2 * 3)) * 0.02, 0)
+            end)
+        end)
+        table.insert(getgenv().EnzoConnections, ac)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+    
+	else
+        local bg=makeCircle(Container,0.9,Color3.fromRGB(30,30,30))
+        makeStroke(bg,Color3.fromRGB(100,100,100),2); makeIcon(bg,Color3.fromRGB(255,255,255),0.5)
+        ToggleBtn.MouseButton1Click:Connect(function() if not hasDragged then doToggle() end end)
+    end
+end
+
+-- Dropdown
+local DropdownToggleUI = Tabs.Player:AddDropdown("ToggleUIVariant", {
+    Title = "Toggle UI Style",
+    Description = "Choose your toggle button design",
+    Values = UI_VARIANTS,
+    Multi = false,
+    Default = "O - Rasengan",
+})
+
+DropdownToggleUI:OnChanged(function(value)
+    buildToggleUI(value)
+end)
+
+-- Build default
+buildToggleUI("O - Rasengan")
+
+-- ========================================
+-- [[ FINAL ]] --
+-- ========================================
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = gameName,
+    Content = "Script loaded! Smart movement + 46 Toggle UI styles!",
+    Duration = 5
+})
+
+SaveManager:LoadAutoloadConfig()
