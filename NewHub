@@ -21,7 +21,8 @@ if PlaceId == 2753915549 or PlaceId == 4442245229 or PlaceId == 7449423635 then
 elseif PlaceId == 95630541662383 then
     -- Prison Life
     print("Menjalankan Script Prison Life...")
-    LoadScript("prison_life.lua")
+    LoadScript("loadstring(game:HttpGet("https://raw.githubusercontent.com/gamesajaCD/Orion/refs/heads/main/World%20Fighters"))()
+")
 
 elseif PlaceId == 1537690962 then
     -- Bee Swarm Simulator
