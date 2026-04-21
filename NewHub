@@ -2,7 +2,7 @@ local PlaceId = game.PlaceId
 
 -- Fungsi untuk load script dari github
 local function LoadScript(fileName)
-    local url = "https://raw.githubusercontent.com/" .. GitHubUser .. "/" .. Repo .. "/" .. Branch .. "/games/" .. fileName
+    local url = "https://raw.githubusercontent.com/gamesajaCD/Orion/refs/heads/main/NewHub"
     local success, result = pcall(function()
         return loadstring(game:HttpGet(url))()
     end)
@@ -18,7 +18,7 @@ if PlaceId == 2753915549 or PlaceId == 4442245229 or PlaceId == 7449423635 then
     print("Menjalankan Script Blox Fruits...")
     LoadScript("bloxfruits.lua")
 
-elseif PlaceId == 155615604 then
+elseif PlaceId == 95630541662383 then
     -- Prison Life
     print("Menjalankan Script Prison Life...")
     LoadScript("prison_life.lua")
