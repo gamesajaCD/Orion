@@ -1,0 +1,35 @@
+local PlaceId = game.PlaceId
+
+-- Fungsi untuk load script dari github
+local function LoadScript(fileName)
+    local url = "https://raw.githubusercontent.com/" .. GitHubUser .. "/" .. Repo .. "/" .. Branch .. "/games/" .. fileName
+    local success, result = pcall(function()
+        return loadstring(game:HttpGet(url))()
+    end)
+    
+    if not success then
+        warn("Gagal memuat script: " .. fileName .. " | Error: " .. result)
+    end
+end
+
+-- Logika Pengecekan ID Game
+if PlaceId == 2753915549 or PlaceId == 4442245229 or PlaceId == 7449423635 then
+    -- Blox Fruits
+    print("Menjalankan Script Blox Fruits...")
+    LoadScript("bloxfruits.lua")
+
+elseif PlaceId == 155615604 then
+    -- Prison Life
+    print("Menjalankan Script Prison Life...")
+    LoadScript("prison_life.lua")
+
+elseif PlaceId == 1537690962 then
+    -- Bee Swarm Simulator
+    print("Menjalankan Script Bee Swarm...")
+    LoadScript("beeswarm.lua")
+
+else
+    -- Jika Game ID tidak terdaftar, jalankan Script Universal atau tampilkan pesan
+    print("Game tidak terdaftar, menjalankan Script Universal...")
+    LoadScript("universal.lua")
+end
