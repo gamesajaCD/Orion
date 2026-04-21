@@ -27,7 +27,23 @@ local Window = Rayfield:CreateWindow({
         RememberJoins = true
     },
 
-    KeySystem = true,
+       KeySystem = true,
+    KeySettings = {
+        Title = "Key System",
+        Subtitle = "Dapatkan key untuk mengakses script",
+        Note = "Klik tombol di bawah untuk mendapatkan key dari Linkvertise",
+        FileName = "MyScriptKey",
+        SaveKey = true,
+        GrabKeyFromSite = true,
+        Actions = {
+            [1] = {
+                Text = "Get Key",
+                Link = "https://link-hub.net/1401075/InacTQsbB8sC"
+            }
+        },
+        KeyURL = "https://gate.sirius.menu/api/validate?sid=sid_0m9mjt9x2kfw"
+    },
+
     ScriptID = "sid_0m9mjt9x2kfw"
 })
 
