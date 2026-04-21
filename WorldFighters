@@ -1,0 +1,357 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+local Window = Rayfield:CreateWindow({
+    Name = gameName,
+    Icon = 0,
+    LoadingTitle = "Loading " .. gameName,
+    LoadingSubtitle = "by Script",
+    Theme = "Default",
+
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "MyScript",
+        FileName = gameName
+    },
+
+    Discord = {
+        Enabled = false,
+        Invite = "",
+        RememberJoins = true
+    },
+
+       KeySystem = true,
+    KeySettings = {
+        Title = "Key System",
+        Subtitle = "Dapatkan key untuk mengakses script",
+        Note = "Klik tombol di bawah untuk mendapatkan key dari Linkvertise",
+        FileName = "MyScriptKey",
+        SaveKey = true,
+        GrabKeyFromSite = true,
+        Actions = {
+            [1] = {
+                Text = "Get Key",
+                Link = "https://link-hub.net/1401075/InacTQsbB8sC"
+            }
+        },
+        KeyURL = "https://gate.sirius.menu/api/validate?sid=sid_0m9mjt9x2kfw"
+    },
+
+    ScriptID = "sid_0m9mjt9x2kfw"
+})
+
+-- ============================================
+-- TAB MAIN
+-- ============================================
+local MainTab = Window:CreateTab("Main", 4483362458)
+
+-- ============================================
+-- SECTION FARM
+-- ============================================
+local FarmSection = MainTab:CreateSection("Farm")
+
+local autoClickEnabled = false
+
+local AutoClickToggle = MainTab:CreateToggle({
+    Name = "Auto Click",
+    CurrentValue = false,
+    Flag = "AutoClickToggle",
+    SectionParent = FarmSection,
+    Callback = function(Value)
+        autoClickEnabled = Value
+    end,
+})
+
+task.spawn(function()
+    while true do
+        if autoClickEnabled then
+            local args = {
+                {
+                    {
+                        "General",
+                        "Attack",
+                        "Click",
+                        {
+                            ["d3e5065e-c627-4fad-a695-78727d6023d7"] = true
+                        },
+                        n = 4
+                    },
+                    "\002"
+                }
+            }
+            ReplicatedStorage:WaitForChild("BridgeNet"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
+        end
+        task.wait(0.01)
+    end
+end)
+
+-- ============================================
+-- SECTION CLAIM
+-- ============================================
+local ClaimSection = MainTab:CreateSection("Claim")
+
+local codes = {
+    "RELEASE",
+    "SRRY4SHUTDOWN",
+    "SRRY4SHUTDOWN2",
+    "SRRY4SHUTDOWN3",
+    "THX1KCCU",
+    "2KCCU!",
+    "THANKYOU3KCCU",
+    "4KONCHAMBER!",
+    "ALREADY5K?",
+    "6KTHXSOMUCH",
+    "7KISALOT!",
+    "THANKS1KLIKES",
+    "100KVISITSONCHAMBER!",
+    "RELEASEPATCH",
+    "TY2KLIKES!!",
+    "THXFOR200KVISITS!",
+    "300KVISITSTHANKYOU!",
+    "400KVISITSINCREDIBLE",
+    "WOW500KVISITS!",
+    "1KFAVORITESTHX!"
+}
+
+local ClaimAllButton = MainTab:CreateButton({
+    Name = "Redeem All Codes",
+    SectionParent = ClaimSection,
+    Callback = function()
+        for i, code in ipairs(codes) do
+            local args = {
+                {
+                    {
+                        "General",
+                        "Codes",
+                        "Redeem",
+                        code,
+                        n = 4
+                    },
+                    "\002"
+                }
+            }
+            ReplicatedStorage:WaitForChild("BridgeNet"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
+
+            Rayfield:Notify({
+                Title = "Code Redeemed",
+                Content = "Berhasil redeem: " .. code .. " (" .. i .. "/" .. #codes .. ")",
+                Duration = 2,
+            })
+
+            task.wait(0.5)
+        end
+
+        Rayfield:Notify({
+            Title = "Selesai!",
+            Content = "Semua " .. #codes .. " code telah di redeem!",
+            Duration = 5,
+        })
+    end,
+})
+
+-- ============================================
+-- SECTION AUTO FARM ENEMIES
+-- ============================================
+local AutoFarmSection = MainTab:CreateSection("Auto Farm")
+
+-- Fungsi untuk scan semua enemies di workspace.Server.Enemies.World
+local function GetAllEnemies()
+    local enemies = {}
+    local worldFolder = workspace:FindFirstChild("Server")
+        and workspace.Server:FindFirstChild("Enemies")
+        and workspace.Server.Enemies:FindFirstChild("World")
+
+    if not worldFolder then
+        return enemies
+    end
+
+    local function ScanFolder(folder)
+        for _, child in ipairs(folder:GetChildren()) do
+            if child:IsA("BasePart") then
+                local id = nil
+                local health = nil
+
+                pcall(function()
+                    id = child:GetAttribute("ID")
+                end)
+                pcall(function()
+                    health = child:GetAttribute("Health")
+                end)
+
+                if id and health ~= nil then
+                    table.insert(enemies, {
+                        Name = child.Name,
+                        Part = child,
+                        ID = id,
+                        Health = health
+                    })
+                end
+            end
+
+            if #child:GetChildren() > 0 then
+                ScanFolder(child)
+            end
+        end
+    end
+
+    ScanFolder(worldFolder)
+    return enemies
+end
+
+-- Fungsi untuk mendapatkan list nama enemies (tanpa duplikat)
+local function GetEnemyNames()
+    local enemies = GetAllEnemies()
+    local names = {}
+    local added = {}
+
+    for _, enemy in ipairs(enemies) do
+        if not added[enemy.Name] then
+            table.insert(names, enemy.Name)
+            added[enemy.Name] = true
+        end
+    end
+
+    if #names == 0 then
+        table.insert(names, "No Enemies Found")
+    end
+
+    return names
+end
+
+-- Fungsi teleport player ke posisi enemy
+local function TeleportTo(position)
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        character.HumanoidRootPart.CFrame = CFrame.new(position + Vector3.new(0, 3, 0))
+    end
+end
+
+-- Fungsi untuk attack enemy berdasarkan ID
+local function AttackEnemy(enemyID)
+    local args = {
+        {
+            {
+                "General",
+                "Attack",
+                "Click",
+                {
+                    [enemyID] = true
+                },
+                n = 4
+            },
+            "\002"
+        }
+    }
+    ReplicatedStorage:WaitForChild("BridgeNet"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
+end
+
+-- Variabel untuk menyimpan pilihan dan status
+local selectedEnemies = {}
+local autoFarmEnabled = false
+
+-- Dropdown Enemies dengan Multi Select dan Auto Refresh
+local EnemyDropdown = MainTab:CreateDropdown({
+    Name = "Select Enemies",
+    Options = GetEnemyNames(),
+    CurrentOption = {},
+    MultipleOptions = true,
+    Flag = "EnemyDropdown",
+    SectionParent = AutoFarmSection,
+    Callback = function(Options)
+        selectedEnemies = Options
+    end,
+})
+
+-- Auto Refresh Dropdown setiap 3 detik
+task.spawn(function()
+    while true do
+        task.wait(3)
+        pcall(function()
+            local newNames = GetEnemyNames()
+            EnemyDropdown:Refresh(newNames)
+        end)
+    end
+end)
+
+-- Toggle Auto Farm Enemies
+local AutoFarmToggle = MainTab:CreateToggle({
+    Name = "Auto Farm Enemies",
+    CurrentValue = false,
+    Flag = "AutoFarmToggle",
+    SectionParent = AutoFarmSection,
+    Callback = function(Value)
+        autoFarmEnabled = Value
+    end,
+})
+
+-- Loop Auto Farm
+task.spawn(function()
+    while true do
+        if autoFarmEnabled and #selectedEnemies > 0 then
+            local allEnemies = GetAllEnemies()
+
+            -- Filter enemies berdasarkan yang dipilih di dropdown
+            local targetEnemies = {}
+            for _, enemy in ipairs(allEnemies) do
+                for _, selectedName in ipairs(selectedEnemies) do
+                    if enemy.Name == selectedName then
+                        -- Cek apakah masih hidup
+                        local currentHealth = nil
+                        pcall(function()
+                            currentHealth = enemy.Part:GetAttribute("Health")
+                        end)
+
+                        if currentHealth and currentHealth > 0 then
+                            table.insert(targetEnemies, enemy)
+                        end
+                        break
+                    end
+                end
+            end
+
+            -- Farm enemies satu per satu
+            for _, enemy in ipairs(targetEnemies) do
+                if not autoFarmEnabled then break end
+
+                -- Cek ulang health sebelum teleport
+                local currentHealth = nil
+                pcall(function()
+                    currentHealth = enemy.Part:GetAttribute("Health")
+                end)
+
+                if currentHealth and currentHealth > 0 and enemy.Part.Parent then
+                    -- Teleport ke enemy
+                    TeleportTo(enemy.Part.Position)
+                    task.wait(0.3)
+
+                    -- Attack sampai health 0
+                    while autoFarmEnabled do
+                        local hp = nil
+                        pcall(function()
+                            hp = enemy.Part:GetAttribute("Health")
+                        end)
+
+                        -- Jika enemy mati atau hilang, lanjut ke berikutnya
+                        if not hp or hp <= 0 or not enemy.Part.Parent then
+                            break
+                        end
+
+                        -- Attack enemy
+                        AttackEnemy(enemy.ID)
+                        task.wait(0.01)
+                    end
+
+                    task.wait(0.2)
+                end
+            end
+        end
+        task.wait(0.1)
+    end
+end)  
